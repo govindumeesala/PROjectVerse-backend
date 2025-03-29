@@ -6,7 +6,7 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   role: { type: String, enum: ["student", "faculty"], default: "student", required: true },
-  year: { type: Number, required: false }, // e.g., graduation or current academic year
+  year: { type: String, required: false }, // e.g., graduation or current academic year
   idNumber: { type: String, required: false }, // student or faculty id
   profilePhoto: { type: String, required: false }, // URL to profile photo
   summary: { type: String, required: false }, // short bio or summary

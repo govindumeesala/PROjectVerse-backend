@@ -1,8 +1,10 @@
 const express = require("express");
 const mongoose = require("mongoose");
-const authRoutes = require("./routes/authRoutes");
 const cors = require("cors");
 require("dotenv").config();
+
+const authRoutes = require("./routes/authRoutes");
+const userRoutes = require("./routes/userRoute");
 
 const app = express();
 app.use(express.json());
@@ -10,6 +12,7 @@ app.use(cors());
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/user", userRoutes);
 
 // Connect to MongoDB and start the server
 const PORT = process.env.PORT || 3000;
