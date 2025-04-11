@@ -10,6 +10,8 @@ const userSchema = new mongoose.Schema({
   idNumber: { type: String, required: false }, // student or faculty id
   profilePhoto: { type: String, required: false }, // URL to profile photo
   summary: { type: String, required: false }, // short bio or summary
+  googleId:{type:String,required:false},
+  authProvider: { type: String, enum: ["google", "local"], default: "local" },
   bookmarks: [{ type: mongoose.Schema.Types.ObjectId, ref: "Project" }],
   createdAt: { type: Date, default: Date.now },
 });
