@@ -5,13 +5,19 @@ const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  role: { type: String, enum: ["student", "faculty"], default: "student", required: true },
+  role: {
+    type: String,
+    enum: ["student", "faculty"],
+    default: "student",
+    required: true,
+  },
   year: { type: String, required: false }, // e.g., graduation or current academic year
   idNumber: { type: String, required: false }, // student or faculty id
   profilePhoto: { type: String, required: false }, // URL to profile photo
   summary: { type: String, required: false }, // short bio or summary
-  googleId:{type:String,required:false},
+  googleId: { type: String, required: false },
   authProvider: { type: String, enum: ["google", "local"], default: "local" },
+  projects: [{ type: mongoose.Schema.Types.ObjectId, ref: "Project" }],
   bookmarks: [{ type: mongoose.Schema.Types.ObjectId, ref: "Project" }],
   createdAt: { type: Date, default: Date.now },
 });

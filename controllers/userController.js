@@ -11,11 +11,12 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET,
   });
 
+  // get user
 exports.getUserDetails = async (req, res, next) => {
   try {
     // `req.user` is populated by the protect middleware.
     const userId = req.user.userId;
-    const user = await User.findById(userId).select("name email");
+    const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }

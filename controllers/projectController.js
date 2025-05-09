@@ -1,9 +1,10 @@
 const Project = require("../models/Project");
+const User = require("../models/User"); // Import the User model to update it
 const cloudinary = require("cloudinary").v2;
 const sharp = require("sharp");
 const streamifier = require("streamifier");
 
-// Cloudinary configuration – make sure your env variables are set
+// Cloudinary configuration – ensure your env variables are set
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -26,7 +27,7 @@ const uploadBufferToCloudinary = (buffer) => {
 
 exports.createProject = async (req, res, next) => {
   try {
-    // Get owner from the auth middleware (which sets req.user)
+    // Get owner from auth middleware (req.user)
     const owner = req.user.userId;
     const { title, description, domain, githubURL, deploymentURL, status, techStack } = req.body;
 
@@ -34,16 +35,16 @@ exports.createProject = async (req, res, next) => {
 
     // Process and upload image if provided
     if (req.file) {
-      // Resize and convert the image using sharp (adjust dimensions as needed)
+      // Resize and optimize the image using sharp (adjust dimensions as needed)
       const processedBuffer = await sharp(req.file.buffer)
-        .resize(500, 300) // For example, a 500x300 pixel image
+        .resize(500, 300) // Example: resize to 500x300 pixels
         .jpeg({ quality: 80 })
         .toBuffer();
       const result = await uploadBufferToCloudinary(processedBuffer);
       projectPhotoUrl = result.secure_url;
     }
 
-    // techStack can be sent as a JSON string from the client or directly as an array.
+    // Convert techStack from a string to an array if needed
     const techStackArray = typeof techStack === "string" ? JSON.parse(techStack) : techStack;
 
     // Create the project document in the database
@@ -59,6 +60,9 @@ exports.createProject = async (req, res, next) => {
       projectPhoto: projectPhotoUrl,
       requests: [] // Initially no requests
     });
+
+    // Update the user document: add a reference to the newly created project.
+    await User.findByIdAndUpdate(owner, { $push: { projects: newProject._id } });
 
     res.status(201).json({ success: true, data: newProject });
   } catch (error) {
