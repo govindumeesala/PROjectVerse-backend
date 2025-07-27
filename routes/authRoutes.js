@@ -6,6 +6,6 @@ const router = express.Router();
 
 router.post("/signup", validateSignup, signup);
 router.post("/login", validateLogin, login);
-router.post("/google", googleAuth); // New route for Google Sign-In
+router.post("/google", googleAuth); 
 
 module.exports = router;
