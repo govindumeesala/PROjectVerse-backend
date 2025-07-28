@@ -8,6 +8,7 @@ const projectSchema = new mongoose.Schema({
   projectPhoto: { type: String, required: false }, // URL to project image
   githubURL: { type: String, required: false },
   deploymentURL: { type: String, required: false },
+  demoURL : {type:String,required:false},
   status: { type: String, enum: ["completed", "looking for collaborators"], default: "looking for collaborators" },
   owner: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // Project owner
   contributors: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // Contributors
