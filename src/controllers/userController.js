@@ -1,26 +1,19 @@
 // controllers/userController.js
 const User = require("../models/User");
-const cloudinary = require("cloudinary").v2;
+const cloudinary = require("../config/cloudinary");
 const sharp = require("sharp");
 const streamifier = require("streamifier");
 
-// Configure Cloudinary (ensure environment variables are set)
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-  });
-
-  // get user
+// Get user details.
 exports.getUserDetails = async (req, res, next) => {
   try {
     // `req.user` is populated by the protect middleware.
     const userId = req.user.userId;
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      throw new Error("User not found");
     }
-    res.status(200).json({ success: true, data: user });
+    res.success(user, "User details retrieved successfully");
   } catch (err) {
     next(err);
   }
@@ -40,7 +33,7 @@ const uploadBufferToCloudinary = (buffer) => {
   });
 };
 
-// Update logged-in user's profile details (with image pre-processing)
+// Update logged-in user's profile details (with image preprocessing)
 exports.updateUser = async (req, res, next) => {
   try {
     // Get userId from protect middleware
@@ -67,9 +60,9 @@ exports.updateUser = async (req, res, next) => {
     }).select("name email year idNumber profilePhoto summary");
 
     if (!updatedUser) {
-      return res.status(404).json({ error: "User not found" });
+      throw new Error("User not found");
     }
-    res.status(200).json({ success: true, data: updatedUser });
+    res.success(updatedUser, "User updated successfully");
   } catch (error) {
     next(error);
   }
