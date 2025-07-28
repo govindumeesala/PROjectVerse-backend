@@ -1,8 +1,8 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
-const admin = require("../firebaseAdmin");
-const secretKey = process.env.JWT_SECRET || "secretkeyappearshere";
-// const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const admin = require("../config/firebaseAdmin");
+const secretKey = process.env.JWT_SECRET;
+const AppError = require("../utils/AppError");
 
 // Signup Controller
 exports.signup = async (req, res, next) => {
@@ -14,10 +14,8 @@ exports.signup = async (req, res, next) => {
       secretKey,
       { expiresIn: "1h" }
     );
-    res.status(201).json({
-      success: true,
-      data: { userId: user._id, email: user.email, token },
-    });
+
+    res.success({ userId: user._id, email: user.email, token }, "User created successfully");
   } catch (err) {
     next(new Error("Error! Something went wrong during signup."));
   }
@@ -29,30 +27,36 @@ exports.login = async (req, res, next) => {
   try {
     const user = await User.findOne({ email });
 
-    if (user.authProvider === "google") {
-      return res.status(403).json({
-        success: false,
-        message: "This email is registered using Google. Please log in using Google.",
-      });
-    }
-    if (!user || !(await user.comparePassword(password))) {
-      return next(new Error("Invalid credentials. Please check your details."));
+    if (!user) {
+      await bcrypt.compare(password, "$2b$10$invalidsaltinvalidsaltinv");
+      return next(new AppError("Invalid credentials. Please check your details.", 401));
     }
 
-    
+    if (user.authProvider === "google") {
+      return next(new AppError("This email is registered using Google. Please log in using Google.", 400));
+    }
+
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return next(new AppError("Invalid credentials. Please check your details.", 401));
+    }
+
+    if (!process.env.JWT_SECRET) {
+      throw new Error("JWT secret not set in environment variables");
+    }
+
     const token = jwt.sign(
-      { userId: user._id, email: user.email },
-      secretKey,
+      { userId: user._id },
+      process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
-    res.status(200).json({
-      success: true,
-      data: { userId: user._id, email: user.email, token },
-    });
+
+    res.success({ userId: user._id, email: user.email, token }, "Login successful");
   } catch (err) {
-    next(new Error("Error! Something went wrong during login."));
+    next(err);
   }
 };
+
 
 exports.googleAuth = async (req, res) => {
   try {
@@ -66,10 +70,7 @@ exports.googleAuth = async (req, res) => {
 
     // If user exists and was created with local signup
     if (user && user.authProvider === "local") {
-      return res.status(403).json({
-        success: false,
-        message: "This email was registered using Email/Password. Please log in using that method.",
-      });
+      throw new AppError("This email is registered using Email/Password. Please log in using that method.", 400);
     }
 
     if (!user) {
@@ -85,19 +86,17 @@ exports.googleAuth = async (req, res) => {
       expiresIn: "1h",
     });
 
-    res.status(200).json({
-      success: true,
-      data: {
-        token,
-        user: {
-          name: user.name,
-          email: user.email,
-          profilePhoto: user.profilePhoto,
-        },
+    const data = {
+      token,
+      user: {
+        name: user.name,
+        email: user.email,
+        profilePhoto: user.profilePhoto,
       },
-    });
+    };
+
+    res.success(data, "Google authentication successful");
   } catch (error) {
-    console.error("Google auth error:", error);
-    res.status(500).json({ error: "Google authentication failed" });
+    next(error);
   }
 };

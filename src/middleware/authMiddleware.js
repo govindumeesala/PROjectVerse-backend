@@ -1,5 +1,8 @@
 const jwt = require("jsonwebtoken");
-const secretKey = process.env.JWT_SECRET || "secretkeyappearshere";
+if (!process.env.JWT_SECRET) {
+  throw new Error("JWT_SECRET environment variable is not set");
+}
+const secretKey = process.env.JWT_SECRET;
 
 exports.protect = (req, res, next) => {
   let token;

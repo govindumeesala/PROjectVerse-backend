@@ -1,15 +1,8 @@
 const Project = require("../models/Project");
 const User = require("../models/User"); // Import the User model to update it
-const cloudinary = require("cloudinary").v2;
+const cloudinary = require("../config/cloudinary");
 const sharp = require("sharp");
 const streamifier = require("streamifier");
-
-// Cloudinary configuration – ensure your env variables are set
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
 
 // Helper function to upload an image buffer to Cloudinary using a stream
 const uploadBufferToCloudinary = (buffer) => {
@@ -64,7 +57,7 @@ exports.createProject = async (req, res, next) => {
     // Update the user document: add a reference to the newly created project.
     await User.findByIdAndUpdate(owner, { $push: { projects: newProject._id } });
 
-    res.status(201).json({ success: true, data: newProject });
+    res.success(newProject, "Project created successfully");
   } catch (error) {
     next(error);
   }
