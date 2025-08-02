@@ -68,3 +68,12 @@ exports.updateUser = async (req, res, next) => {
   }
 };
 
+// controllers/userController.js or similar
+exports.getAllUsers = async (req, res, next) => {
+  try {
+    const users = await User.find({}, "name email"); // Only select necessary fields
+    res.status(200).json(users);
+  } catch (err) {
+    next(err);
+  }
+};

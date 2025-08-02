@@ -1,6 +1,6 @@
 // routes/userRoute.js
 const express = require("express");
-const { getUserDetails, updateUser } = require("../controllers/userController");
+const { getUserDetails, updateUser,getAllUsers } = require("../controllers/userController");
 const { protect } = require("../middleware/authMiddleware");
 const { validateUserUpdate } = require("../middleware/validators");
 const multer = require("multer");
@@ -16,5 +16,6 @@ const upload = multer({ storage });
 
 // PATCH /api/user - update user profile with image upload
 router.patch("/", protect, validateUserUpdate, upload.single("profilePhoto"), updateUser);
+router.get("/all", getAllUsers);
 
 module.exports = router;
