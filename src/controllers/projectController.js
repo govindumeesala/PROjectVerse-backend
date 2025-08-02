@@ -22,7 +22,7 @@ exports.createProject = async (req, res, next) => {
   try {
     // Get owner from auth middleware (req.user)
     const owner = req.user.userId;
-    const { title, description, domain, githubURL, deploymentURL, status, techStack } = req.body;
+    const { title, description, domain, githubURL, deploymentURL, status, techStack, contributors,lookingForContributors } = req.body;
 
     let projectPhotoUrl;
 
@@ -51,13 +51,15 @@ exports.createProject = async (req, res, next) => {
       status,
       owner,
       projectPhoto: projectPhotoUrl,
+      contributors: contributors || [], // Ensure contributors is an array
+      lookingForContributors,
       requests: [] // Initially no requests
     });
 
     // Update the user document: add a reference to the newly created project.
     await User.findByIdAndUpdate(owner, { $push: { projects: newProject._id } });
 
-    res.success(newProject, "Project created successfully");
+    res.success(message = "Project created successfully");
   } catch (error) {
     next(error);
   }
