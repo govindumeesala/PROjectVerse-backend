@@ -1,19 +1,15 @@
 const jwt = require("jsonwebtoken");
-if (!process.env.JWT_SECRET) {
-  throw new Error("JWT_SECRET environment variable is not set");
-}
-const secretKey = process.env.JWT_SECRET;
+
+const jwt_access_token_secret = process.env.ACCESS_TOKEN_SECRET;
 
 exports.protect = (req, res, next) => {
-  let token;
-  if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
-    token = req.headers.authorization.split(" ")[1];
-  }
-  if (!token) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ error: "Not authorized, no token" });
   }
+  const token = authHeader.split(" ")[1];
   try {
-    const decoded = jwt.verify(token, secretKey);
+    const decoded = jwt.verify(token, jwt_access_token_secret);
     req.user = decoded;
     next();
   } catch (err) {

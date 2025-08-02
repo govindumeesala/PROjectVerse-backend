@@ -1,6 +1,7 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const cookieParser = require("cookie-parser");
 require("dotenv").config();
 
 const authRoutes = require("./src/routes/authRoutes");
@@ -8,9 +9,15 @@ const userRoutes = require("./src/routes/userRoute");
 const projectRoutes = require("./src/routes/projectRoute");
 const {successHandler, errorHandler} = require("./src/middleware/apiResponseMiddleware");
 
+const allowedOrigins = ["http://localhost:5173"]; // adjust to your frontend origin
+
 const app = express();
 app.use(express.json());
-app.use(cors());
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true, // IMPORTANT: allow cookies
+}));
+app.use(cookieParser());
 app.use(successHandler);
 
 // Routes
