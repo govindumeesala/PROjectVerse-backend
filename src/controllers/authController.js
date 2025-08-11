@@ -106,7 +106,7 @@ exports.googleAuth = async (req, res, next) => {
     const accessToken = generateAccessToken({ userId: user._id });
     const refreshToken = generateRefreshToken({ userId: user._id });
   
-
+ 
     // Send refresh token in cookie
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
