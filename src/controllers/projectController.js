@@ -3,6 +3,7 @@ const User = require("../models/User"); // Import the User model to update it
 const cloudinary = require("../config/cloudinary");
 const sharp = require("sharp");
 const streamifier = require("streamifier");
+const {StatusCodes} = require("http-status-codes");
 
 // Helper function to upload an image buffer to Cloudinary using a stream
 const uploadBufferToCloudinary = (buffer) => {
@@ -59,7 +60,7 @@ exports.createProject = async (req, res, next) => {
     // Update the user document: add a reference to the newly created project.
     await User.findByIdAndUpdate(owner, { $push: { projects: newProject._id } });
 
-    res.success("Project created successfully", StatusCodes.CREATED);
+    res.success(message="Project created successfully", status=StatusCodes.CREATED);
   } catch (error) {
     next(error);
   }

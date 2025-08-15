@@ -2,9 +2,9 @@ const { StatusCodes } = require("http-status-codes");
 
 exports.successHandler = (req, res, next) => {
   res.success = (
-    data = null, // Default to null if not provided
+    statusCode = StatusCodes.OK,
     message = "Success",
-    statusCode = StatusCodes.OK
+    data = null, // Default to null if not provided
   ) => {
     res.status(statusCode).json({
       success: true,

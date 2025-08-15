@@ -16,7 +16,7 @@ exports.getUserDetails = async (req, res, next) => {
     if (!user) {
       throw new AppError("User not found", StatusCodes.NOT_FOUND);
     }
-    res.success(user, "User details retrieved successfully", StatusCodes.OK);
+    res.success(StatusCodes.OK, "User details retrieved successfully", user);
   } catch (err) {
     next(err);
   }
@@ -69,7 +69,7 @@ exports.updateUser = async (req, res, next) => {
     if (!updatedUser) {
       throw new AppError("User not found", StatusCodes.NOT_FOUND);
     }
-    res.success(updatedUser, "User updated successfully", StatusCodes.OK);
+    res.success(StatusCodes.OK, "User updated successfully", updatedUser);
   } catch (error) {
     next(error);
   }
@@ -83,7 +83,7 @@ exports.getAllUsers = async (req, res, next) => {
     if (users.length === 0) {
       throw new Error("No users found");
     }
-    res.success(users, "All users retrieved successfully", StatusCodes.OK);
+    res.success(StatusCodes.OK, "All users retrieved successfully", users);
   } catch (err) {
     next(err);
   }

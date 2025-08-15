@@ -43,7 +43,7 @@ exports.signup = async (req, res, next) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    res.success({ user: { userId: user._id, email: user.email }, accessToken }, "User created successfully", StatusCodes.CREATED);
+    res.success(StatusCodes.CREATED, "User created successfully", { user: { userId: user._id, email: user.email }, accessToken });
   } catch (err) {
     next(new AppError("Error! Something went wrong during signup."));
   }
@@ -70,7 +70,7 @@ exports.login = async (req, res, next) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    res.success({ user: { userId: user._id, email: user.email }, accessToken }, "Login successful", StatusCodes.OK);
+    res.success(StatusCodes.OK, "Login successful", { user: { userId: user._id, email: user.email }, accessToken });
   } catch (err) {
     next(err);
   }
@@ -125,7 +125,7 @@ exports.googleAuth = async (req, res, next) => {
       },
     };
 
-    res.success(data, "Google authentication successful", StatusCodes.OK);
+    res.success(StatusCodes.OK, "Google authentication successful", data);
   } catch (error) {
     next(error);
   }
@@ -137,7 +137,7 @@ exports.logout = (req, res) => {
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
   });
-  res.success("Logged out successfully", StatusCodes.OK);
+  res.success(StatusCodes.OK, "Logged out successfully");
 };
 
 exports.refresh = async (req, res) => {
@@ -148,7 +148,7 @@ exports.refresh = async (req, res) => {
     const payload = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
     const newAccessToken = generateAccessToken({ userId: payload.userId });
 
-    res.success({ accessToken: newAccessToken }, "Access token refreshed successfully", StatusCodes.OK);
+    res.success(StatusCodes.OK, "Access token refreshed successfully", { accessToken: newAccessToken });
   } catch (err) {
     res.status(403).json({ error: "Invalid or expired refresh token" });
   }
