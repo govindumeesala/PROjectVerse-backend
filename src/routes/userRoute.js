@@ -16,6 +16,6 @@ const upload = multer({ storage });
 
 // PATCH /api/user - update user profile with image upload
 router.patch("/", protect, validateUserUpdate, upload.single("profilePhoto"), updateUser);
-router.get("/all", getAllUsers);
+router.get("/all", protect, getAllUsers);
 
 module.exports = router;

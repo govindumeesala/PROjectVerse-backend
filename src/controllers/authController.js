@@ -1,5 +1,6 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
+const { StatusCodes } = require("http-status-codes");
 const admin = require("../config/firebaseAdmin");
 const AppError = require("../utils/AppError");
 
@@ -23,11 +24,11 @@ exports.signup = async (req, res, next) => {
     const existingUser = await User.findOne({ email });
 
     if (existingUser && existingUser.authProvider === "google") {
-      throw new AppError("This email is registered using Google. Please log in using that method.", 400);
+      throw new AppError("This email is registered using Google. Please log in using that method.", StatusCodes.BAD_REQUEST);
     }
 
     if (existingUser) {
-      return next(new AppError("User already exists.", 400));
+      return next(new AppError("User already exists.", StatusCodes.BAD_REQUEST));
     }
 
     const user = await User.create({ name, email, password });
@@ -42,7 +43,7 @@ exports.signup = async (req, res, next) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    res.success({ user: { userId: user._id, email: user.email }, accessToken }, "User created successfully");
+    res.success({ user: { userId: user._id, email: user.email }, accessToken }, "User created successfully", StatusCodes.CREATED);
   } catch (err) {
     next(new AppError("Error! Something went wrong during signup."));
   }
@@ -69,7 +70,7 @@ exports.login = async (req, res, next) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    res.success({ user: { userId: user._id, email: user.email }, accessToken }, "Login successful");
+    res.success({ user: { userId: user._id, email: user.email }, accessToken }, "Login successful", StatusCodes.OK);
   } catch (err) {
     next(err);
   }
@@ -89,7 +90,7 @@ exports.googleAuth = async (req, res, next) => {
 
     // If user exists and was created with local signup
     if (user && user.authProvider === "local") {
-      throw new AppError("This email is registered using Email/Password. Please log in using that method.", 400);
+      throw new AppError("This email is registered using Email/Password. Please log in using that method.", StatusCodes.FORBIDDEN);
     }
 
     // If user doesn't exist, create one
@@ -124,7 +125,7 @@ exports.googleAuth = async (req, res, next) => {
       },
     };
 
-    res.success(data, "Google authentication successful");
+    res.success(data, "Google authentication successful", StatusCodes.OK);
   } catch (error) {
     next(error);
   }
@@ -136,7 +137,7 @@ exports.logout = (req, res) => {
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
   });
-  res.success({}, "Logged out successfully");
+  res.success("Logged out successfully", StatusCodes.OK);
 };
 
 exports.refresh = async (req, res) => {
@@ -147,7 +148,7 @@ exports.refresh = async (req, res) => {
     const payload = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
     const newAccessToken = generateAccessToken({ userId: payload.userId });
 
-    res.success({ accessToken: newAccessToken }, "Access token refreshed successfully");
+    res.success({ accessToken: newAccessToken }, "Access token refreshed successfully", StatusCodes.OK);
   } catch (err) {
     res.status(403).json({ error: "Invalid or expired refresh token" });
   }

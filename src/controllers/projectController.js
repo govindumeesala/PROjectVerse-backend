@@ -59,7 +59,7 @@ exports.createProject = async (req, res, next) => {
     // Update the user document: add a reference to the newly created project.
     await User.findByIdAndUpdate(owner, { $push: { projects: newProject._id } });
 
-    res.success(message = "Project created successfully");
+    res.success("Project created successfully", StatusCodes.CREATED);
   } catch (error) {
     next(error);
   }

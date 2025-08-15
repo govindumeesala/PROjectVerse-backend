@@ -1,8 +1,6 @@
 # TODO:
 1. add guard in sign up route to prevent duplicate email registration - done
 
-Nice — here’s a clear, prioritized **TODO checklist** (backend → frontend → QA → extras) you can follow to finish the Profile page (private + public) including **My Projects / Collaborated / Bookmarks** tabs. Each item includes what to implement, why, and small notes about payloads/behavior so you can just pick and work.
-
 # Plan & TODOs (in order)
 
 ---

@@ -1,8 +1,11 @@
-// controllers/userController.js
-const User = require("../models/User");
-const cloudinary = require("../config/cloudinary");
+const {StatusCodes} = require('http-status-codes')
 const sharp = require("sharp");
 const streamifier = require("streamifier");
+
+// local imports
+const User = require("../models/User");
+const cloudinary = require("../config/cloudinary");
+const AppError = require('../utils/AppError');
 
 // Get user details.
 exports.getUserDetails = async (req, res, next) => {
@@ -11,9 +14,9 @@ exports.getUserDetails = async (req, res, next) => {
     const userId = req.user.userId;
     const user = await User.findById(userId);
     if (!user) {
-      throw new Error("User not found");
+      throw new AppError("User not found", StatusCodes.NOT_FOUND);
     }
-    res.success(user, "User details retrieved successfully");
+    res.success(user, "User details retrieved successfully", StatusCodes.OK);
   } catch (err) {
     next(err);
   }
@@ -40,6 +43,10 @@ exports.updateUser = async (req, res, next) => {
     const userId = req.user.userId;
     let updateData = { ...req.body };
 
+    if (!userId) {
+      throw new AppError("User id not provided", StatusCodes.BAD_REQUEST);
+    }
+
     // If an image file is provided, process and upload it
     if (req.file) {
       // Use sharp to resize and optimize the image from memory
@@ -60,9 +67,9 @@ exports.updateUser = async (req, res, next) => {
     }).select("name email year idNumber profilePhoto summary");
 
     if (!updatedUser) {
-      throw new Error("User not found");
+      throw new AppError("User not found", StatusCodes.NOT_FOUND);
     }
-    res.success(updatedUser, "User updated successfully");
+    res.success(updatedUser, "User updated successfully", StatusCodes.OK);
   } catch (error) {
     next(error);
   }
@@ -71,8 +78,12 @@ exports.updateUser = async (req, res, next) => {
 // controllers/userController.js or similar
 exports.getAllUsers = async (req, res, next) => {
   try {
-    const users = await User.find({}, "name email"); // Only select necessary fields
-    res.status(200).json(users);
+    const users = await User.find({}, "name email");
+
+    if (users.length === 0) {
+      throw new Error("No users found");
+    }
+    res.success(users, "All users retrieved successfully", StatusCodes.OK);
   } catch (err) {
     next(err);
   }
