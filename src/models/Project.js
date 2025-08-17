@@ -12,7 +12,7 @@ const projectSchema = new mongoose.Schema({
   status: { type: String, enum: ["completed", "ongoing"], default: "ongoing" },
   lookingForContributors: { type: Boolean, default: false }, // Whether the project is looking for contributors
   owner: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // Project owner
-  // contributors: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // Contributors
+  // contributors: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // Contributors should get only from collaborations model
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });

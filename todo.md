@@ -24,7 +24,7 @@
 
 Make these endpoints robust first — the frontend consumes them.
 
-1. **GET `/api/user/`** — `userController.getMe`
+1. **GET `/api/user/`** — `userController.getMe` - DONE
 
    * Returns user profile fields: `_id, name, email, idNumber, year, profilePhoto, summary, role`.
    * Also include simple counts if cheap: `projectsCount`, `collaborationsCount`, `contributionsCount`, `bookmarksCount`.
@@ -33,19 +33,20 @@ Make these endpoints robust first — the frontend consumes them.
      ```json
      { "success": true, "data": { /* fields + counts */ } }
      ```
-2. **PATCH `/api/users/me`** — `userController.updateMe`
+2. **PATCH `/api/user/`** — `userController.updateMe` - DONE
 
    * Accept `multipart/form-data` (field `profilePhoto` optional).
    * Use `multer` memory storage -> `sharp` resize -> upload to Cloudinary -> save URL in `user.profilePhoto`.
    * Validate input and only allow owner to update.
    * Return updated user DTO.
    * Postman test: send `form-data` with text fields + file.
-3. **GET `/api/users/me/stats`** — `userController.getMyStats`
+3. **GET `/api/user/stats`** — `userController.getMyStats` - DONE
 
    * Compute counts via `countDocuments` / aggregations:
 
-     * `projectsOwned`, `projectsContributed` (`Project.contributors`), `collaborationRecords` (if Collaboration model used), `projectsCompleted`, etc.
+     * `projectsOwned`, `projectsContributed`, `collaborationRecords` (if Collaboration model used), `projectsCompleted`, etc.
    * Return a small JSON object used for analytics card.
+
 4. **GET `/api/projects/my`** — `projectController.getMyProjects`
 
    * Query params: `page`, `limit`, `status`, `search`.
@@ -106,15 +107,16 @@ Implement hooks and components in this order — use React Query + your `authSto
    * `ProfilePage` container that queries `useGetMyProfile()` and `useGetMyStats()` and renders:
 
      1. **Top navbar** (existing component)
-     2. **ProfileHeader** component:
+     2. **ProfileHeader** component: - DONE
 
         * Circular profile photo (if none, show skeleton/avatar).
         * Name, email, idNumber, year, summary.
         * Edit button (opens a modal or toggles editable form).
-     3. **StatsCard** component:
+     3. **StatsCard** component: - DONE
 
         * Big numbers: `projectsOwned`, `collaborationsCount`, `contributionsCount`, `bookmarksCount`.
         * Maybe small chart or progress bars (optional).
+
      4. **Tabs** component (shadcn/ui Tabs):
 
         * Tabs: `My Projects`, `Collaborated`, `Bookmarks`
@@ -223,4 +225,3 @@ If you want I can now:
 * generate **exact route + controller code** for `GET /api/users/me`, `PATCH /api/users/me` (with multer + sharp + cloudinary) and `GET /api/users/me/stats`; **or**
 * generate the **frontend React Query hooks + ProfilePage / ProfileHeader / StatsCard components** (with shadcn/ui + Tailwind) that call the endpoints above.
 
-Which do you want me to produce first?

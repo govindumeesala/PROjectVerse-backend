@@ -2,7 +2,8 @@ const mongoose = require("mongoose");
 
 const collaborationSchema = new mongoose.Schema({
   project: { type: mongoose.Schema.Types.ObjectId, ref: "Project", required: true },
-  user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  owner: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  collaborator: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // since a user may be a collaborator but not registered in our system
   role: { type: String }, // role in the collaboration
   startedAt: { type: Date, default: Date.now },
   endedAt: { type: Date, default: null }, // optional if collaboration ends

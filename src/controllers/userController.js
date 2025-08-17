@@ -1,9 +1,12 @@
 const {StatusCodes} = require('http-status-codes')
 const sharp = require("sharp");
 const streamifier = require("streamifier");
+const mongoose = require("mongoose");
 
 // local imports
 const User = require("../models/User");
+const Project = require("../models/Project");
+const Collaboration = require("../models/Collaboration");
 const cloudinary = require("../config/cloudinary");
 const AppError = require('../utils/AppError');
 
@@ -18,7 +21,7 @@ exports.getUserDetails = async (req, res, next) => {
 
     // Select only the required fields. Using .lean() returns a plain JS object (faster).
     const user = await User.findById(userId)
-      .select("_id name idNumber year summary profilePhoto")
+      .select("_id name email idNumber year summary profilePhoto")
       .lean();
 
     if (!user) {
@@ -95,6 +98,52 @@ exports.getAllUsers = async (req, res, next) => {
       throw new Error("No users found");
     }
     res.success(StatusCodes.OK, "All users retrieved successfully", users);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/users/stats (get logged-in user's stats)
+exports.getMyStats = async (req, res, next) => {
+  try {
+    const uid = req.user && req.user.userId;
+    if (!uid) {
+      return next(new AppError("Unauthorized: missing user id", StatusCodes.UNAUTHORIZED));
+    }
+
+    // Project counts: active & completed
+    const [activeProjects, completedProjects] = await Promise.all([
+      Project.countDocuments({ owner: uid, status: "ongoing" }),
+      Project.countDocuments({ owner: uid, status: "completed" }),
+    ]);
+
+    // projectsOwned can be derived from the above:
+    const projectsOwned = (activeProjects || 0) + (completedProjects || 0);
+
+    // collaborationsCount: number of collaboration records on user's projects (owner === userId)
+    const collaborationsCount = await Collaboration.countDocuments({ owner: uid });
+
+    // contributionsCount: number of collaboration records where user is a collaborator.
+    // If you want to exclude contributions to own projects, add owner: { $ne: uid }.
+    const contributionsCount = await Collaboration.countDocuments({
+      collaborator: uid,
+      owner: { $ne: uid }, 
+    });
+
+    // bookmarksCount from user doc (only bookmarks array length)
+    const userDoc = await User.findById(uid).select("bookmarks").lean();
+    const bookmarksCount = (userDoc && Array.isArray(userDoc.bookmarks)) ? userDoc.bookmarks.length : 0;
+
+    const stats = {
+      projectsOwned,
+      activeProjects: activeProjects || 0,
+      completedProjects: completedProjects || 0,
+      collaborationsCount: collaborationsCount || 0,
+      contributionsCount: contributionsCount || 0,
+      bookmarksCount,
+    };
+
+    return res.success(StatusCodes.OK, "User stats retrieved successfully", stats);
   } catch (err) {
     next(err);
   }
