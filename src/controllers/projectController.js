@@ -52,7 +52,7 @@ exports.createProject = async (req, res, next) => {
       status,
       owner,
       projectPhoto: projectPhotoUrl,
-      contributors: contributors || [], // Ensure contributors is an array
+      // contributors: contributors || [], // not required here
       lookingForContributors,
       requests: [] // Initially no requests
     });

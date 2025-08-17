@@ -7,16 +7,27 @@ const User = require("../models/User");
 const cloudinary = require("../config/cloudinary");
 const AppError = require('../utils/AppError');
 
-// Get user details.
+// GET /api/users   (get logged-in user's basic profile)
 exports.getUserDetails = async (req, res, next) => {
   try {
-    // `req.user` is populated by the protect middleware.
-    const userId = req.user.userId;
-    const user = await User.findById(userId);
-    if (!user) {
-      throw new AppError("User not found", StatusCodes.NOT_FOUND);
+    // req.user is populated by your protect middleware
+    const userId = req.user?.userId;
+    if (!userId) {
+      return next(new AppError("Unauthorized", StatusCodes.UNAUTHORIZED));
     }
-    res.success(StatusCodes.OK, "User details retrieved successfully", user);
+
+    // Select only the required fields. Using .lean() returns a plain JS object (faster).
+    const user = await User.findById(userId)
+      .select("_id name idNumber year summary profilePhoto")
+      .lean();
+
+    if (!user) {
+      return next(new AppError("User not found", StatusCodes.NOT_FOUND));
+    }
+
+    // Use your res.success helper which expects (data, message?, statusCode?)
+    // Send a minimal object (avoid leaking internal DB fields)
+    return res.success(StatusCodes.OK, "User details retrieved successfully", user);
   } catch (err) {
     next(err);
   }
@@ -64,7 +75,7 @@ exports.updateUser = async (req, res, next) => {
     const updatedUser = await User.findByIdAndUpdate(userId, updateData, {
       new: true,
       runValidators: true,
-    }).select("name email year idNumber profilePhoto summary");
+    });
 
     if (!updatedUser) {
       throw new AppError("User not found", StatusCodes.NOT_FOUND);

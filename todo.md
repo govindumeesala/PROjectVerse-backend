@@ -24,7 +24,7 @@
 
 Make these endpoints robust first — the frontend consumes them.
 
-1. **GET `/api/users/me`** — `userController.getMe`
+1. **GET `/api/user/`** — `userController.getMe`
 
    * Returns user profile fields: `_id, name, email, idNumber, year, profilePhoto, summary, role`.
    * Also include simple counts if cheap: `projectsCount`, `collaborationsCount`, `contributionsCount`, `bookmarksCount`.
