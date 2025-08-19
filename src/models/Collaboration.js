@@ -6,7 +6,6 @@ const collaborationSchema = new mongoose.Schema({
   collaborator: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // since a user may be a collaborator but not registered in our system
   role: { type: String }, // role in the collaboration
   startedAt: { type: Date, default: Date.now },
-  endedAt: { type: Date, default: null }, // optional if collaboration ends
   contributionSummary: { type: String }, // short note
   request: { type: mongoose.Schema.Types.ObjectId, ref: "ProjectRequest" }, // optional link back to the request
   createdAt: { type: Date, default: Date.now },

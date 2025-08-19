@@ -15,7 +15,7 @@ exports.successHandler = (req, res, next) => {
   next();
 };
 
-exports.errorHandler = (err, req, res) => {
+exports.errorHandler = (err, req, res,next) => {
   console.log(req.method, req.url);
   console.error(err.stack);
   res.status(err.statusCode || StatusCodes.INTERNAL_SERVER_ERROR).json({
