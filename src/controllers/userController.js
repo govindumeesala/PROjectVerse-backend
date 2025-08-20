@@ -21,7 +21,7 @@ exports.getUserDetails = async (req, res, next) => {
 
     // Select only the required fields. Using .lean() returns a plain JS object (faster).
     const user = await User.findById(userId)
-      .select("_id name email idNumber year summary profilePhoto")
+      .select("_id name email idNumber year summary profilePhoto socials")
       .lean();
 
     if (!user) {
@@ -56,6 +56,15 @@ exports.updateUser = async (req, res, next) => {
     // Get userId from protect middleware
     const userId = req.user.userId;
     let updateData = { ...req.body };
+
+    // Parse socials if sent as JSON string (from FormData)
+    if (typeof updateData.socials === "string") {
+      try {
+        updateData.socials = JSON.parse(updateData.socials);
+      } catch {
+        updateData.socials = {};
+      }
+    }
 
     if (!userId) {
       throw new AppError("User id not provided", StatusCodes.BAD_REQUEST);

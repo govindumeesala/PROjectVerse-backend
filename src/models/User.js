@@ -20,6 +20,14 @@ const userSchema = new mongoose.Schema({
   projects: [{ type: mongoose.Schema.Types.ObjectId, ref: "Project" }],
   bookmarks: [{ type: mongoose.Schema.Types.ObjectId, ref: "Project" }],
   createdAt: { type: Date, default: Date.now },
+  socials: {
+    github: { type: String, default: "" },
+    linkedin: { type: String, default: "" },
+    instagram: { type: String, default: "" },
+    // Add more as needed, e.g.:
+    // twitter: { type: String, default: "" },
+    // website: { type: String, default: "" },
+  },
 });
 
 // Hash password before saving
