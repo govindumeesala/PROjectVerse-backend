@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const projectSchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: { type: String, required: true },
-  domain: { type: String, required: true }, // e.g., Web Dev, AI, etc.
+  domain: [{ type: String, required: true }], // e.g., Web Dev, AI, etc.
   techStack: [{ type: String, required: true }], // e.g., ["React", "Node.js", "MongoDB"]
   projectPhoto: { type: String, required: false }, // URL to project image
   githubURL: { type: String, required: false },

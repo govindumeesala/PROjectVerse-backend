@@ -70,21 +70,13 @@ exports.createProject = async (req, res, next) => {
     // ✅ link project to owner
     await User.findByIdAndUpdate(owner, { $push: { projects: newProject._id } });
 
-    // ✅ create collaboration for the owner
-    await Collaboration.create({
-      project: newProject._id,
-      owner,
-      collaborator: owner,
-      role: "Owner",
-      contributionSummary: "Project creator"
-    });
-
     // ✅ create collaborations for contributors if provided
     if (contributors.length > 0) {
+      console.log("Creating collaborations for contributors:", contributors);
       const collabs = contributors.map(c => ({
         project: newProject._id,
         owner,
-        collaborator: c.userId,
+        collaborator: c._id || c.userId,
         role: c.role || "Contributor",
         contributionSummary: c.contributionSummary || ""
       }));
