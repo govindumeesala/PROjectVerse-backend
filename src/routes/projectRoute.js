@@ -1,7 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const { createProject,getMyProjects,getProjectById } = require("../controllers/projectController");
+const { createProject, getMyProjects, getProjectById, getContributedProjects } = require("../controllers/projectController");
 const { protect } = require("../middleware/authMiddleware");
+const  pagination = require("../middleware/pagination");
 const multer = require("multer");
 const {
   getProjectFeed,
@@ -22,7 +23,10 @@ const upload = multer({ storage });
 router.post("/create", protect, upload.single("projectPhoto"), createProject);
 
 // GET /api/projects/my-projects
-router.get("/my-projects", protect, getMyProjects);
+router.get("/my-projects", protect, pagination(), getMyProjects);
+
+// GET /api/projects/contributed
+router.get("/contributed", protect, pagination(), getContributedProjects);
 
 // FEED
 router.get("/feed", protect, getProjectFeed);
