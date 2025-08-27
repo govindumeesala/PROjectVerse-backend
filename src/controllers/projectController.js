@@ -1,12 +1,13 @@
 const Project = require("../models/Project");
-const User = require("../models/User"); // Import the User model to update it
+const User = require("../models/User");
 const Collaboration = require("../models/Collaboration");
 const cloudinary = require("../config/cloudinary");
 const sharp = require("sharp");
 const streamifier = require("streamifier");
-const {StatusCodes} = require("http-status-codes");
+const { StatusCodes } = require("http-status-codes");
+const AppError = require("../utils/AppError"); // ✅ custom error class (if you have one)
 
-// Helper function to upload an image buffer to Cloudinary using a stream
+// Helper: upload buffer to Cloudinary
 const uploadBufferToCloudinary = (buffer) => {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
@@ -20,19 +21,20 @@ const uploadBufferToCloudinary = (buffer) => {
   });
 };
 
+// CREATE PROJECT
 exports.createProject = async (req, res, next) => {
   try {
     const owner = req.user.userId;
-    const { 
-      title, 
-      description, 
-      domain, 
-      githubURL, 
-      deploymentURL, 
-      status, 
-      techStack, 
-      contributors = [], // array of { userId, role?, contributionSummary? }
-      lookingForContributors 
+    const {
+      title,
+      description,
+      domain,
+      githubURL,
+      deploymentURL,
+      status,
+      techStack,
+      contributors = [],
+      lookingForContributors,
     } = req.body;
 
     let projectPhotoUrl;
@@ -64,52 +66,50 @@ exports.createProject = async (req, res, next) => {
       owner,
       projectPhoto: projectPhotoUrl,
       lookingForContributors,
-      requests: []
+      requests: [],
     });
 
     // ✅ link project to owner
     await User.findByIdAndUpdate(owner, { $push: { projects: newProject._id } });
 
-    // ✅ create collaborations for contributors if provided
+    // ✅ handle contributors
     if (contributors.length > 0) {
-      console.log("Creating collaborations for contributors:", contributors);
-      const collabs = contributors.map(c => ({
+      const collabs = contributors.map((c) => ({
         project: newProject._id,
         owner,
         collaborator: c._id || c.userId,
         role: c.role || "Contributor",
-        contributionSummary: c.contributionSummary || ""
+        contributionSummary: c.contributionSummary || "",
       }));
       await Collaboration.insertMany(collabs);
 
-      // also link project to each contributor in User.projects
-      const contributorIds = contributors.map(c => c.userId);
+      const contributorIds = contributors.map((c) => c.userId);
       await User.updateMany(
         { _id: { $in: contributorIds } },
         { $push: { projects: newProject._id } }
       );
     }
 
-    // ✅ send success response
-    res.success(StatusCodes.CREATED, "Project created successfully", newProject);
-
+    return res.success(
+      StatusCodes.CREATED,
+      "Project created successfully",
+      newProject
+    );
   } catch (err) {
     next(err);
   }
 };
 
-
-
+// GET USER PROJECTS
 exports.getMyProjects = async (req, res, next) => {
   try {
     const userId = req.user.userId;
 
     const projects = await Project.find({ owner: userId })
-      .sort({ createdAt: -1 }) // newest first
-      .select("title summary createdAt status techStack"); 
-      // only selecting fields we need for list view
+      .sort({ createdAt: -1 })
+      .select("title description createdAt status techStack");
 
-    res.success(
+    return res.success(
       StatusCodes.OK,
       "User projects retrieved successfully",
       projects
@@ -119,17 +119,102 @@ exports.getMyProjects = async (req, res, next) => {
   }
 };
 
+// GET PROJECT BY ID
 exports.getProjectById = async (req, res, next) => {
   try {
     const project = await Project.findById(req.params.id)
-      .populate("owner", "name email profilePhoto") // show basic owner details
-      .populate("contributors.user", "name email profilePhoto"); // if you maintain contributors
+      .populate("owner", "name email profilePhoto")
+      .populate("contributors.user", "name email profilePhoto");
 
     if (!project) {
       throw new AppError("Project not found", StatusCodes.NOT_FOUND);
     }
 
-    res.success(StatusCodes.OK, "Project details retrieved", project);
+    return res.success(StatusCodes.OK, "Project details retrieved", project);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// FEED
+exports.getProjectFeed = async (req, res, next) => {
+  try {
+    const { cursor, limit = 10, techStack, domain, search } = req.query;
+    let query = {};
+
+    if (cursor) query.createdAt = { $lt: new Date(cursor) };
+    if (techStack)
+      query.techStack = { $in: techStack.split(",").map((s) => s.trim()) };
+    if (domain)
+      query.domain = { $in: domain.split(",").map((s) => s.trim()) };
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    let projects = await Project.find(query)
+      .populate("owner", "name profilePhoto")
+      .sort({ createdAt: -1 })
+      .limit(Number(limit) + 1);
+
+    let nextCursor = null;
+    if (projects.length > limit) {
+      nextCursor = projects[limit - 1].createdAt;
+      projects = projects.slice(0, limit);
+    }
+
+    return res.success(
+      StatusCodes.OK,
+      "Projects retrieved successfully",
+      { projects, nextCursor }
+    );
+  } catch (err) {
+    next(err);
+  }
+};
+
+// LIKE PROJECT
+exports.likeProject = async (req, res, next) => {
+  try {
+    const project = await Project.findById(req.params.id);
+    if (!project) {
+      throw new AppError("Project not found", StatusCodes.NOT_FOUND);
+    }
+    if (!project.likes.includes(req.user.userId)) {
+      project.likes.push(req.user.userId);
+      await project.save();
+    }
+
+    return res.success(
+      StatusCodes.OK,
+      "Project liked successfully",
+      { likes: project.likes.length }
+    );
+  } catch (err) {
+    next(err);
+  }
+};
+
+// UNLIKE PROJECT
+exports.unlikeProject = async (req, res, next) => {
+  try {
+    const project = await Project.findById(req.params.id);
+    if (!project) {
+      throw new AppError("Project not found", StatusCodes.NOT_FOUND);
+    }
+
+    project.likes = project.likes.filter(
+      (id) => id.toString() !== req.user.userId.toString()
+    );
+    await project.save();
+
+    return res.success(
+      StatusCodes.OK,
+      "Project unliked successfully",
+      { likes: project.likes.length }
+    );
   } catch (err) {
     next(err);
   }
