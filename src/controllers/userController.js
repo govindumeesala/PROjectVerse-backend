@@ -104,7 +104,7 @@ exports.getAllUsers = async (req, res, next) => {
     const users = await User.find({}, "name email _id");
 
     if (users.length === 0) {
-      throw new Error("No users found");
+      throw new AppError("No users found", StatusCodes.NOT_FOUND);
     }
     res.success(StatusCodes.OK, "All users retrieved successfully", users);
   } catch (err) {
@@ -153,6 +153,89 @@ exports.getMyStats = async (req, res, next) => {
     };
 
     return res.success(StatusCodes.OK, "User stats retrieved successfully", stats);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /api/user/bookmarks
+ * Returns bookmarked projects stored on the user's document.
+ */
+/**
+ * GET /api/user/bookmarks
+ */
+exports.getBookmarks = async (req, res, next) => {
+  try {
+    const userId = req.user && req.user.userId;
+    if (!userId) throw new AppError("Authentication required", StatusCodes.UNAUTHORIZED);
+
+    const { page, limit, skip, filters } = req.paging;
+
+    const user = await User.findById(userId).select("bookmarks").lean();
+    if (!user) throw new AppError("User not found", StatusCodes.NOT_FOUND);
+
+    const bookmarkIds = user.bookmarks || [];
+
+    if (!bookmarkIds.length) {
+      return res.success(StatusCodes.OK, "No bookmarks found", {
+        items: [],
+        total: 0,
+        page,
+        limit,
+      });
+    }
+
+    const baseFilter = {
+      _id: { $in: bookmarkIds },
+      ...filters,
+    };
+
+    const [total, items] = await Promise.all([
+      Project.countDocuments(baseFilter),
+      Project.find(baseFilter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate("owner", "name profilePhoto _id")
+        .lean(),
+    ]);
+
+    // attach contributors
+    const projectIds = items.map((p) => p._id).filter(Boolean);
+    if (projectIds.length > 0) {
+      const collaborations = await Collaboration.find({ project: { $in: projectIds } })
+        .populate("collaborator", "name profilePhoto _id")
+        .lean();
+
+      const map = collaborations.reduce((acc, c) => {
+        if (!c.project) return acc;
+        const pid = c.project.toString();
+        if (!acc[pid]) acc[pid] = [];
+        if (c.collaborator) {
+          acc[pid].push({
+            _id: c.collaborator._id,
+            name: c.collaborator.name,
+            profilePhoto: c.collaborator.profilePhoto,
+            role: c.role || undefined,
+            contributionSummary: c.contributionSummary || undefined,
+          });
+        }
+        return acc;
+      }, {});
+
+      items.forEach((p) => {
+        const arr = map[p._id.toString()] || [];
+        if (arr.length > 0) p.contributors = arr;
+      });
+    }
+
+    res.success(StatusCodes.OK, "Bookmarks retrieved successfully", {
+      items,
+      total,
+      page,
+      limit,
+    });
   } catch (err) {
     next(err);
   }

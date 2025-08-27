@@ -3,6 +3,7 @@ const express = require("express");
 const userService = require("../controllers/userController");
 const { protect } = require("../middleware/authMiddleware");
 const { validateUserUpdate } = require("../middleware/validators");
+const pagination = require("../middleware/pagination");
 const multer = require("multer");
 
 const router = express.Router();
@@ -22,5 +23,8 @@ router.get("/all", protect, userService.getAllUsers);
 
 // GET /api/user/stats - new stats endpoint
 router.get("/stats", protect, userService.getMyStats);
+
+// GET bookmarked projects
+router.get("/bookmarks", protect, pagination(), userService.getBookmarks);
 
 module.exports = router;
