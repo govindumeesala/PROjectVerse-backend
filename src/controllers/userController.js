@@ -240,3 +240,57 @@ exports.getBookmarks = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * PUT /api/user/bookmarks/:projectId
+ * Body: { action: "add" | "remove" }
+ *
+ * Adds or removes projectId from the authenticated user's bookmarks.
+ * Returns a simple action result in data: { action: "added" | "removed", projectId }
+ */
+exports.toggleBookmark = async (req, res, next) => {
+  try {
+    const userId = req.user && req.user.userId;
+    if (!userId) throw new AppError("Authentication required", StatusCodes.UNAUTHORIZED);
+
+    const { projectId } = req.params;
+    const { action } = req.body || {};
+
+    if (!projectId) {
+      throw new AppError("Invalid projectId", StatusCodes.BAD_REQUEST);
+    }
+
+    if (!["add", "remove"].includes(action)) {
+      throw new AppError("Invalid action. Must be 'add' or 'remove'.", StatusCodes.BAD_REQUEST);
+    }
+
+    // ensure project exists
+    const project = await Project.findById(projectId).select("_id title").lean();
+    if (!project) throw new AppError("Project not found", StatusCodes.NOT_FOUND);
+
+    // fetch user bookmarks
+    const user = await User.findById(userId).select("bookmarks");
+    if (!user) throw new AppError("User not found", StatusCodes.NOT_FOUND);
+
+    const alreadyBookmarked = (user.bookmarks || []).some((id) => id.toString() === projectId.toString());
+
+    if (action === "add") {
+      if (alreadyBookmarked) {
+        return res.success(StatusCodes.OK, "Project already bookmarked", { action: "added", projectId });
+      }
+      user.bookmarks.push(projectId);
+      await user.save();
+      return res.success(StatusCodes.OK, "Project added to bookmarks", { action: "added", projectId });
+    } else {
+      // action === "remove"
+      if (!alreadyBookmarked) {
+        return res.success(StatusCodes.OK, "Project not bookmarked", { action: "removed", projectId });
+      }
+      user.bookmarks = (user.bookmarks || []).filter((id) => id.toString() !== projectId.toString());
+      await user.save();
+      return res.success(StatusCodes.OK, "Project removed from bookmarks", { action: "removed", projectId });
+    }
+  } catch (err) {
+    next(err);
+  }
+};

@@ -47,18 +47,18 @@ Make these endpoints robust first — the frontend consumes them.
      * `projectsOwned`, `projectsContributed`, `collaborationRecords` (if Collaboration model used), `projectsCompleted`, etc.
    * Return a small JSON object used for analytics card.
 
-4. **GET `/api/projects/my`** — `projectController.getMyProjects`
+4. **GET `/api/projects/my`** — `projectController.getMyProjects` - DONE
 
    * Query params: `page`, `limit`, `status`, `search`.
    * Paginated response with `items`, `total`, `page`, `limit`.
-5. **GET `/api/projects/collaborated`** — `projectController.getCollaboratedProjects`
+5. **GET `/api/projects/CONTRIBUTED`** — `projectController.getCollaboratedProjects` - DONE
 
    * Projects where `contributors` includes userId (or join `Collaboration`).
    * Same pagination and filters as above.
-6. **GET `/api/users/me/bookmarks`** — `userController.getBookmarks`
+6. **GET `/api/users/me/bookmarks`** — `userController.getBookmarks` - DONE
 
    * Return bookmarked projects (paginated).
-7. **POST `/api/users/me/bookmarks/:projectId`** and **DELETE `/api/users/me/bookmarks/:projectId`**
+7. **POST `/api/users/me/bookmarks/:projectId`** and **DELETE `/api/users/me/bookmarks/:projectId`** - DONE
 
    * Add/remove project id to `user.bookmarks` using `$addToSet` / `$pull`.
    * Return updated bookmarks or success status.
@@ -117,14 +117,14 @@ Implement hooks and components in this order — use React Query + your `authSto
         * Big numbers: `projectsOwned`, `collaborationsCount`, `contributionsCount`, `bookmarksCount`.
         * Maybe small chart or progress bars (optional).
 
-     4. **Tabs** component (shadcn/ui Tabs):
+     4. **Tabs** component (shadcn/ui Tabs): - done
 
-        * Tabs: `My Projects`, `Collaborated`, `Bookmarks`
-        * Each tab loads corresponding list via React Query (lazy load on first open).
-     5. **ProjectList** (reusable) + **ProjectCard** components (show image, title, status, owner, small actions: open, bookmark, request to join).
-     6. **Pagination** component to move pages.
+        * Tabs: `My Projects`, `Collaborated`, `Bookmarks` - done
+        * Each tab loads corresponding list via React Query (lazy load on first open). 
+     5. **ProjectList** (reusable) + **ProjectCard** components (show image, title, status, owner, small actions: open, bookmark, request to join). - PARTIALLY DONE
+     6. **Pagination** component to move pages. - done 
      7. **Footer** (existing).
-   * `ProfileEditModal`:
+   * `ProfileEditModal`: - done 
 
      * Form uses `react-hook-form` + `zod` for client-side validation.
      * Includes file input for profile photo → build `FormData`, call `useUpdateMyProfile()`.
