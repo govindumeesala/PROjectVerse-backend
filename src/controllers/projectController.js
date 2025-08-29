@@ -1,6 +1,5 @@
 const Project = require("../models/Project");
 const User = require("../models/User"); 
-const User = require("../models/User");
 const Collaboration = require("../models/Collaboration");
 const cloudinary = require("../config/cloudinary");
 const sharp = require("sharp");
@@ -8,6 +7,7 @@ const streamifier = require("streamifier");
 const { StatusCodes } = require("http-status-codes");
 const AppError = require("../utils/AppError"); // ✅ custom error class (if you have one)
 const mongoose = require("mongoose");
+const Types = require("mongoose");
 
 // Helper: upload buffer to Cloudinary
 const uploadBufferToCloudinary = (buffer) => {
@@ -137,41 +137,123 @@ exports.getProjectById = async (req, res, next) => {
     next(err);
   }
 };
+// const mongoose = require("mongoose");
+// const { StatusCodes } = require("http-status-codes");
+// const Project = require("../models/projectModel");
+// const Comment = require("../models/commentModel");
+// const User = require("../models/userModel");
 
 // FEED
 exports.getProjectFeed = async (req, res, next) => {
   try {
     const { cursor, limit = 10, techStack, domain, search } = req.query;
-    let query = {};
+    
+    const userId = req.user?.userId ? new mongoose.Types.ObjectId(req.user.userId) : null;
 
-    if (cursor) query.createdAt = { $lt: new Date(cursor) };
-    if (techStack)
-      query.techStack = { $in: techStack.split(",").map((s) => s.trim()) };
-    if (domain)
-      query.domain = { $in: domain.split(",").map((s) => s.trim()) };
+
+    let match = {};
+
+    if (cursor) {
+      match.createdAt = { $lt: new Date(cursor) };
+    }
+    if (techStack) {
+      match.techStack = { $in: techStack.split(",").map((s) => s.trim()) };
+    }
+    if (domain) {
+      match.domain = { $in: domain.split(",").map((s) => s.trim()) };
+    }
     if (search) {
-      query.$or = [
+      match.$or = [
         { title: { $regex: search, $options: "i" } },
         { description: { $regex: search, $options: "i" } },
       ];
     }
 
-    let projects = await Project.find(query)
-      .populate("owner", "name profilePhoto")
-      .sort({ createdAt: -1 })
-      .limit(Number(limit) + 1);
+    const projects = await Project.aggregate([
+      { $match: match },
+
+      // sort & pagination (fetch one extra to detect nextCursor)
+      { $sort: { createdAt: -1 } },
+      { $limit: Number(limit) + 1 },
+
+      // join owner info
+      {
+        $lookup: {
+          from: "users",
+          localField: "owner",
+          foreignField: "_id",
+          as: "owner",
+          pipeline: [{ $project: { name: 1, profilePhoto: 1 } }],
+        },
+      },
+      { $unwind: "$owner" },
+
+      // count comments
+      {
+        $lookup: {
+          from: "comments",
+          let: { projectId: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$project", "$$projectId"] } } },
+            { $count: "count" },
+          ],
+          as: "commentsCount",
+        },
+      },
+      {
+        $addFields: {
+          commentsCount: { $ifNull: [{ $arrayElemAt: ["$commentsCount.count", 0] }, 0] },
+        },
+      },
+
+      // compute likes count + likedByUser
+      {
+        $addFields: {
+          likesCount: { $size: { $ifNull: ["$likes", []] } },
+          likedByUser: {
+            $cond: [
+              userId ? { $in: [userId, { $ifNull: ["$likes", []] }] } : false,
+              true,
+              false,
+            ],
+          },
+        },
+      },
+
+      // compute bookmarkedByUser
+      ...(userId
+        ? [
+            {
+              $lookup: {
+                from: "users",
+                localField: "_id",
+                foreignField: "bookmarks",
+                as: "bookmarkedUsers",
+                pipeline: [{ $match: { _id: userId } }],
+              },
+            },
+            {
+              $addFields: {
+                bookmarkedByUser: { $gt: [{ $size: "$bookmarkedUsers" }, 0] },
+              },
+            },
+            { $project: { bookmarkedUsers: 0 } },
+          ]
+        : [{ $addFields: { bookmarkedByUser: false } }]),
+    ]);
 
     let nextCursor = null;
+    let finalProjects = projects;
+
     if (projects.length > limit) {
       nextCursor = projects[limit - 1].createdAt;
-      projects = projects.slice(0, limit);
+      finalProjects = projects.slice(0, limit);
     }
 
-    return res.success(
-      StatusCodes.OK,
-      "Projects retrieved successfully",
-      { projects, nextCursor }
-    );
+    return res.success(StatusCodes.OK, "Projects retrieved successfully", {
+      projects: finalProjects,
+      nextCursor,
+    });
   } catch (err) {
     next(err);
   }
@@ -179,13 +261,14 @@ exports.getProjectFeed = async (req, res, next) => {
 
 // LIKE PROJECT
 exports.likeProject = async (req, res, next) => {
+  const userObjectId = new mongoose.Types.ObjectId(req.user.userId);
   try {
     const project = await Project.findById(req.params.id);
     if (!project) {
       throw new AppError("Project not found", StatusCodes.NOT_FOUND);
     }
-    if (!project.likes.includes(req.user.userId)) {
-      project.likes.push(req.user.userId);
+    if (!project.likes.includes(userObjectId)) {
+      project.likes.push(userObjectId);
       await project.save();
     }
 
@@ -201,6 +284,7 @@ exports.likeProject = async (req, res, next) => {
 
 // UNLIKE PROJECT
 exports.unlikeProject = async (req, res, next) => {
+  const userObjectId = new mongoose.Types.ObjectId(req.user.userId);
   try {
     const project = await Project.findById(req.params.id);
     if (!project) {
@@ -208,7 +292,7 @@ exports.unlikeProject = async (req, res, next) => {
     }
 
     project.likes = project.likes.filter(
-      (id) => id.toString() !== req.user.userId.toString()
+      (id) => !id.equals(userObjectId)
     );
     await project.save();
 

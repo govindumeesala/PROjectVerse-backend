@@ -3,7 +3,6 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 require("dotenv").config();
-const bookmarkRoutes = require("./src/routes/bookmarkRoutes");
 
 const authRoutes = require("./src/routes/authRoutes");
 const userRoutes = require("./src/routes/userRoute");
@@ -24,8 +23,7 @@ app.use(successHandler);
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
-app.use("/api/project", projectRoutes)
-app.use("/api/bookmarks", bookmarkRoutes);
+app.use("/api/project", projectRoutes);
 
 // Place error handler after all routes
 app.use(errorHandler);

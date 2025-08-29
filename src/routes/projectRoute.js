@@ -35,8 +35,8 @@ router.get("/feed", protect, getProjectFeed);
 router.get("/:id", protect, getProjectById);
 
 // LIKE
-router.post("/:id/like", protect, likeProject);
-router.post("/:id/unlike", protect, unlikeProject);
+router.put("/:id/like", protect, likeProject);
+router.put("/:id/unlike", protect, unlikeProject);
 
 // // SHARE → Just reuse getProjectById
 // router.get("/:id", protect, getProjectById);
