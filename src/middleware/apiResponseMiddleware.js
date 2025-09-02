@@ -12,6 +12,9 @@ exports.successHandler = (req, res, next) => {
       data: data ?? null, // Ensure data is never undefined
     });
   };
+
+  console.log(req.method, req.url, res.statusCode);
+
   next();
 };
 

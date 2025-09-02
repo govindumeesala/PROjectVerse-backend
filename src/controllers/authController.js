@@ -18,20 +18,35 @@ const generateRefreshToken = (payload) => {
 
 // Signup Controller
 exports.signup = async (req, res, next) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, username } = req.body;
   try {
-
+    // Check if email exists
     const existingUser = await User.findOne({ email });
 
     if (existingUser && existingUser.authProvider === "google") {
-      throw new AppError("This email is registered using Google. Please log in using that method.", StatusCodes.BAD_REQUEST);
+      throw new AppError(
+        "This email is registered using Google. Please log in using that method.", 
+        StatusCodes.BAD_REQUEST
+      );
     }
 
     if (existingUser) {
-      return next(new AppError("User already exists.", StatusCodes.BAD_REQUEST));
+      return next(new AppError("Email already exists.", StatusCodes.BAD_REQUEST));
     }
 
-    const user = await User.create({ name, email, password });
+    // Check if username exists
+    const existingUsername = await User.findOne({ username });
+    if (existingUsername) {
+      return next(new AppError("Username already taken.", StatusCodes.BAD_REQUEST));
+    }
+
+    const user = await User.create({ 
+      name, 
+      email, 
+      password,
+      username,
+      authProvider: "local" 
+    });
 
     const accessToken = generateAccessToken({ userId: user._id });
     const refreshToken = generateRefreshToken({ userId: user._id });
@@ -45,16 +60,23 @@ exports.signup = async (req, res, next) => {
 
     res.success(StatusCodes.CREATED, "User created successfully", { user: { userId: user._id, email: user.email }, accessToken });
   } catch (err) {
-    next(new AppError("Error! Something went wrong during signup."));
+    next(err);
   }
 };
 
 
 // Login Controller
 exports.login = async (req, res, next) => {
-  const { email, password } = req.body;
+  const { emailOrUsername, password } = req.body;
+  
   try {
-    const user = await User.findOne({ email });
+    // Find user by email or username
+    const user = await User.findOne({
+      $or: [
+        { email: emailOrUsername },
+        { username: emailOrUsername }
+      ]
+    });
 
     if (!user || !(await user.comparePassword(password))) {
       return next(new AppError("Invalid credentials.", 401));
@@ -80,7 +102,7 @@ exports.login = async (req, res, next) => {
 
 exports.googleAuth = async (req, res, next) => {
   try {
-    const { idToken } = req.body;
+    const { idToken, username } = req.body;
     if (!idToken) return res.status(400).json({ error: "No ID token provided" });
 
     const decodedToken = await admin.auth().verifyIdToken(idToken);
@@ -88,27 +110,53 @@ exports.googleAuth = async (req, res, next) => {
 
     let user = await User.findOne({ email });
 
-    // If user exists and was created with local signup
+    // If user exists with local auth
     if (user && user.authProvider === "local") {
-      throw new AppError("This email is registered using Email/Password. Please log in using that method.", StatusCodes.FORBIDDEN);
+      throw new AppError(
+        "This email is registered using Email/Password. Please log in using that method.", 
+        StatusCodes.FORBIDDEN
+      );
     }
 
-    // If user doesn't exist, create one
-    if (!user) {
-      user = await User.create({
-        name,
-        email,
-        profilePhoto: picture,
-        authProvider: "google",
+    // For existing Google users, proceed with login
+    if (user) {
+      const accessToken = generateAccessToken({ userId: user._id });
+      const refreshToken = generateRefreshToken({ userId: user._id });
+
+      res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+
+      return res.success(StatusCodes.OK, "Login successful", {
+        accessToken,
+        user: {
+          name: user.name,
+          email: user.email,
+          profilePhoto: user.profilePhoto,
+        },
       });
     }
 
-    // Generate tokens
+    // For new users, username is required
+    if (!username) {
+      throw new AppError("Username is required for new users", StatusCodes.NOT_FOUND);
+    }
+
+    // Create new user with username
+    user = await User.create({
+      name,
+      email,
+      username,
+      profilePhoto: picture,
+      authProvider: "google",
+    });
+
     const accessToken = generateAccessToken({ userId: user._id });
     const refreshToken = generateRefreshToken({ userId: user._id });
-  
- 
-    // Send refresh token in cookie
+
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -116,16 +164,14 @@ exports.googleAuth = async (req, res, next) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    const data = {
+    res.success(StatusCodes.CREATED, "Account created successfully", {
       accessToken,
       user: {
         name: user.name,
         email: user.email,
         profilePhoto: user.profilePhoto,
       },
-    };
-
-    res.success(StatusCodes.OK, "Google authentication successful", data);
+    });
   } catch (error) {
     next(error);
   }

@@ -28,6 +28,15 @@ const userSchema = new mongoose.Schema({
     // twitter: { type: String, default: "" },
     // website: { type: String, default: "" },
   },
+  username: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true,
+    minlength: 3,
+    maxlength: 30,
+    match: [/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers and underscore']
+  },
 });
 
 // Hash password before saving
