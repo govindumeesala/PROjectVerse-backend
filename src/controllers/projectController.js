@@ -1,5 +1,5 @@
 const Project = require("../models/Project");
-const User = require("../models/User"); 
+const User = require("../models/User");
 const Collaboration = require("../models/Collaboration");
 const cloudinary = require("../config/cloudinary");
 const sharp = require("sharp");
@@ -24,6 +24,8 @@ const uploadBufferToCloudinary = (buffer) => {
 };
 
 // CREATE PROJECT
+// src/controllers/projectController.js
+
 exports.createProject = async (req, res, next) => {
   try {
     const owner = req.user.userId;
@@ -35,68 +37,68 @@ exports.createProject = async (req, res, next) => {
       deploymentURL,
       status,
       techStack,
-      contributors = [],
+      contributors = [], // The array of user IDs from the frontend
       lookingForContributors,
+      additionalURL,
     } = req.body;
 
     let projectPhotoUrl;
 
-    // ✅ handle image upload
+    // ✅ handle image upload (no change here, this is correct)
     if (req.file) {
       const processedBuffer = await sharp(req.file.buffer)
         .resize(500, 300)
         .jpeg({ quality: 80 })
         .toBuffer();
-
       const result = await uploadBufferToCloudinary(processedBuffer);
       projectPhotoUrl = result.secure_url;
     }
 
-    // ✅ ensure tech stack is array
-    const techStackArray =
-      typeof techStack === "string" ? JSON.parse(techStack) : techStack;
-
-    // ✅ create project
+    // ✅ create project (no change here, this is correct)
     const newProject = await Project.create({
       title,
       description,
       domain,
-      techStack: techStackArray,
+      techStack, // Already an array from the frontend
       githubURL,
       deploymentURL,
       status,
       owner,
       projectPhoto: projectPhotoUrl,
       lookingForContributors,
+      additionalURL,
       requests: [],
     });
 
-    // ✅ link project to owner
-    await User.findByIdAndUpdate(owner, { $push: { projects: newProject._id } });
+    // ✅ Link project to owner (correct)
+    await User.findByIdAndUpdate(owner, {
+      $push: { projects: newProject._id },
+    });
 
     // ✅ handle contributors
     if (contributors.length > 0) {
-      const collabs = contributors.map((c) => ({
+      // Correctly map the user IDs to the Collaboration model
+      const collabs = contributors.map((contributorId) => ({
         project: newProject._id,
         owner,
-        collaborator: c._id || c.userId,
-        role: c.role || "Contributor",
-        contributionSummary: c.contributionSummary || "",
+        collaborator: contributorId, // Use the ID directly
+        role: "Contributor", // Default role
+        contributionSummary: "",
       }));
       await Collaboration.insertMany(collabs);
 
-      const contributorIds = contributors.map((c) => c.userId);
+      // Correctly update users to link the new project
       await User.updateMany(
-        { _id: { $in: contributorIds } },
+        { _id: { $in: contributors } }, // `contributors` is already the array of IDs
         { $push: { projects: newProject._id } }
       );
     }
 
-    return res.success(
-      StatusCodes.CREATED,
-      "Project created successfully",
-      newProject
-    );
+    return res.status(201).json({
+      success: true,
+      message: "Project created successfully",
+      data: newProject,
+    });
   } catch (err) {
     next(err);
   }
@@ -137,31 +139,48 @@ exports.getProjectById = async (req, res, next) => {
     next(err);
   }
 };
-// const mongoose = require("mongoose");
-// const { StatusCodes } = require("http-status-codes");
-// const Project = require("../models/projectModel");
-// const Comment = require("../models/commentModel");
-// const User = require("../models/userModel");
 
 // FEED
+// src/controllers/projectController.js
 exports.getProjectFeed = async (req, res, next) => {
   try {
     const { cursor, limit = 10, techStack, domain, search } = req.query;
-    
-    const userId = req.user?.userId ? new mongoose.Types.ObjectId(req.user.userId) : null;
 
+    const userId = req.user?.userId
+      ? new mongoose.Types.ObjectId(req.user.userId)
+      : null;
 
     let match = {};
 
+    // 1. Handle cursor-based pagination
     if (cursor) {
       match.createdAt = { $lt: new Date(cursor) };
     }
+
+    // 2. Handle techStack filter
+    let techStackArray = [];
     if (techStack) {
-      match.techStack = { $in: techStack.split(",").map((s) => s.trim()) };
+      // Check if it's an array from the frontend or a comma-separated string
+      techStackArray = Array.isArray(techStack)
+        ? techStack
+        : techStack.split(",").map((s) => s.trim());
+      if (techStackArray.length > 0) {
+        match.techStack = { $in: techStackArray };
+      }
     }
+
+    // 3. Handle domain filter
+    let domainArray = [];
     if (domain) {
-      match.domain = { $in: domain.split(",").map((s) => s.trim()) };
+      domainArray = Array.isArray(domain)
+        ? domain
+        : domain.split(",").map((s) => s.trim());
+      if (domainArray.length > 0) {
+        match.domain = { $in: domainArray };
+      }
     }
+
+    // 4. Handle search filter
     if (search) {
       match.$or = [
         { title: { $regex: search, $options: "i" } },
@@ -169,14 +188,12 @@ exports.getProjectFeed = async (req, res, next) => {
       ];
     }
 
+    // The rest of your aggregation pipeline is already performant.
     const projects = await Project.aggregate([
       { $match: match },
-
-      // sort & pagination (fetch one extra to detect nextCursor)
       { $sort: { createdAt: -1 } },
       { $limit: Number(limit) + 1 },
 
-      // join owner info
       {
         $lookup: {
           from: "users",
@@ -187,8 +204,30 @@ exports.getProjectFeed = async (req, res, next) => {
         },
       },
       { $unwind: "$owner" },
-
-      // count comments
+      
+      {
+        $lookup: {
+          from: "collaborations", // The collection that links projects and collaborators
+          localField: "_id",
+          foreignField: "project",
+          as: "collaborations",
+          pipeline: [
+            // Join the collaborator user data within the sub-pipeline
+            {
+              $lookup: {
+                from: "users",
+                localField: "collaborator",
+                foreignField: "_id",
+                as: "collaborator",
+                pipeline: [{ $project: { name:1, profilePhoto:1, _id:1 } }],
+              },
+            },
+            { $unwind: "$collaborator" },
+            { $replaceRoot: { newRoot: "$collaborator" } }
+          ],
+        },
+      },
+      
       {
         $lookup: {
           from: "comments",
@@ -202,11 +241,11 @@ exports.getProjectFeed = async (req, res, next) => {
       },
       {
         $addFields: {
-          commentsCount: { $ifNull: [{ $arrayElemAt: ["$commentsCount.count", 0] }, 0] },
+          commentsCount: {
+            $ifNull: [{ $arrayElemAt: ["$commentsCount.count", 0] }, 0],
+          },
         },
       },
-
-      // compute likes count + likedByUser
       {
         $addFields: {
           likesCount: { $size: { $ifNull: ["$likes", []] } },
@@ -219,8 +258,6 @@ exports.getProjectFeed = async (req, res, next) => {
           },
         },
       },
-
-      // compute bookmarkedByUser
       ...(userId
         ? [
             {
@@ -250,9 +287,13 @@ exports.getProjectFeed = async (req, res, next) => {
       finalProjects = projects.slice(0, limit);
     }
 
-    return res.success(StatusCodes.OK, "Projects retrieved successfully", {
-      projects: finalProjects,
-      nextCursor,
+    return res.status(200).json({
+      success: true,
+      message: "Projects retrieved successfully",
+      data: {
+        projects: finalProjects,
+        nextCursor,
+      },
     });
   } catch (err) {
     next(err);
@@ -272,11 +313,9 @@ exports.likeProject = async (req, res, next) => {
       await project.save();
     }
 
-    return res.success(
-      StatusCodes.OK,
-      "Project liked successfully",
-      { likes: project.likes.length }
-    );
+    return res.success(StatusCodes.OK, "Project liked successfully", {
+      likes: project.likes.length,
+    });
   } catch (err) {
     next(err);
   }
@@ -291,16 +330,12 @@ exports.unlikeProject = async (req, res, next) => {
       throw new AppError("Project not found", StatusCodes.NOT_FOUND);
     }
 
-    project.likes = project.likes.filter(
-      (id) => !id.equals(userObjectId)
-    );
+    project.likes = project.likes.filter((id) => !id.equals(userObjectId));
     await project.save();
 
-    return res.success(
-      StatusCodes.OK,
-      "Project unliked successfully",
-      { likes: project.likes.length }
-    );
+    return res.success(StatusCodes.OK, "Project unliked successfully", {
+      likes: project.likes.length,
+    });
   } catch (err) {
     next(err);
   }
@@ -312,11 +347,15 @@ exports.unlikeProject = async (req, res, next) => {
 exports.getMyProjects = async (req, res, next) => {
   try {
     const userId = req.user && req.user.userId;
-    if (!userId) throw new AppError("Authentication required", StatusCodes.UNAUTHORIZED);
+    if (!userId)
+      throw new AppError("Authentication required", StatusCodes.UNAUTHORIZED);
 
     const { page, limit, skip, filters } = req.paging;
 
-    const baseFilter = { owner: new mongoose.Types.ObjectId(userId), ...filters };
+    const baseFilter = {
+      owner: new mongoose.Types.ObjectId(userId),
+      ...filters,
+    };
 
     const [total, items] = await Promise.all([
       Project.countDocuments(baseFilter),
@@ -331,7 +370,9 @@ exports.getMyProjects = async (req, res, next) => {
     // attach contributors for each project (if any)
     const projectIds = items.map((p) => p._id).filter(Boolean);
     if (projectIds.length > 0) {
-      const collaborations = await Collaboration.find({ project: { $in: projectIds } })
+      const collaborations = await Collaboration.find({
+        project: { $in: projectIds },
+      })
         .populate("collaborator", "name profilePhoto _id")
         .lean();
 
@@ -378,14 +419,19 @@ exports.getMyProjects = async (req, res, next) => {
 exports.getContributedProjects = async (req, res, next) => {
   try {
     const userId = req.user && req.user.userId;
-    if (!userId) throw new AppError("Authentication required", StatusCodes.UNAUTHORIZED);
+    if (!userId)
+      throw new AppError("Authentication required", StatusCodes.UNAUTHORIZED);
 
     const { page, limit, skip, filters } = req.paging;
 
     // Find collaborations where collaborator == userId
-    const collaborationsByUser = await Collaboration.find({ collaborator: userId }).lean();
+    const collaborationsByUser = await Collaboration.find({
+      collaborator: userId,
+    }).lean();
 
-    const projectIds = collaborationsByUser.map((c) => c.project).filter(Boolean);
+    const projectIds = collaborationsByUser
+      .map((c) => c.project)
+      .filter(Boolean);
 
     if (!projectIds.length) {
       return res.success(StatusCodes.OK, "No collaborated projects found", {
@@ -414,7 +460,9 @@ exports.getContributedProjects = async (req, res, next) => {
     // attach contributors for each project (if any)
     const fetchedProjectIds = items.map((p) => p._id).filter(Boolean);
     if (fetchedProjectIds.length > 0) {
-      const collaborations = await Collaboration.find({ project: { $in: fetchedProjectIds } })
+      const collaborations = await Collaboration.find({
+        project: { $in: fetchedProjectIds },
+      })
         .populate("collaborator", "name profilePhoto _id")
         .lean();
 
