@@ -10,16 +10,6 @@ router.post("/login", login);
 router.post("/google", googleAuth); 
 router.post("/logout", logout);
 router.post("/refresh", refresh);
-router.post("/check-username", async (req, res, next) => {
-  const { username } = req.body;
-  try {
-    const exists = await User.findOne({ username });
-    res.success(StatusCodes.OK, "Username availability checked", { 
-      available: !exists 
-    });
-  } catch (err) {
-    next(err);
-  }
-});
+router.post("/check-username", checkUsername);
 
 module.exports = router;

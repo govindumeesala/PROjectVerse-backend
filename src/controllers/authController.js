@@ -196,6 +196,18 @@ exports.refresh = async (req, res) => {
 
     res.success(StatusCodes.OK, "Access token refreshed successfully", { accessToken: newAccessToken });
   } catch (err) {
-    res.status(403).json({ error: "Invalid or expired refresh token" });
+    next(err);
+  }
+};
+
+exports.checkUsername = async (req, res, next) => {
+  const { username } = req.body;
+  try {
+    const exists = await User.findOne({ username });
+    res.success(StatusCodes.OK, "Username availability checked", {
+      available: !exists
+    });
+  } catch (err) {
+    next(err);
   }
 };
