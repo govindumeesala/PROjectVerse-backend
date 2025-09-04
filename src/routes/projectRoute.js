@@ -8,6 +8,7 @@ const {
   getProjectFeed,
   likeProject,
   unlikeProject,
+  checkTitle,
 } = require("../controllers/projectController");
 
 const {
@@ -21,6 +22,7 @@ const upload = multer({ storage });
 
 // POST /api/project/create - Create a new project
 router.post("/create", protect, upload.single("projectPhoto"), createProject);
+router.post("/check-title", protect, checkTitle);
 
 // GET /api/projects/my-projects
 router.get("/my-projects", protect, pagination(), getMyProjects);

@@ -100,9 +100,34 @@ exports.createProject = async (req, res, next) => {
       data: newProject,
     });
   } catch (err) {
+    if (err.code === 11000 && err.keyPattern?.title) {
+      return res.status(400).json({
+        success: false,
+        message: "You already have a project with this title. Choose another.",
+      });
+    }
     next(err);
   }
 };
+
+//API for checking Availability
+exports.checkTitle = async (req, res) => {
+  try {
+    const owner = req.user.userId;
+    const { title } = req.body;
+
+    const exists = await Project.findOne({ owner, title: { $regex: new RegExp(`^${title}$`, 'i') } });
+    return res.json({
+      available: !exists,
+      message: exists
+        ? "You already used this title."
+        : "This title is available.",
+    });
+  } catch (err) {
+    return res.status(500).json({ available: false, message: "Server error" });
+  }
+};
+
 
 // GET USER PROJECTS
 exports.getMyProjects = async (req, res, next) => {
