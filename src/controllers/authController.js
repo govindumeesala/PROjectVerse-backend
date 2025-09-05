@@ -58,7 +58,7 @@ exports.signup = async (req, res, next) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    res.success(StatusCodes.CREATED, "User created successfully", { user: { userId: user._id, email: user.email }, accessToken });
+    res.success(StatusCodes.CREATED, "User created successfully", { user: { userId: user._id, email: user.email, name: user.name, username: user.username }, accessToken });
   } catch (err) {
     next(err);
   }
@@ -92,7 +92,7 @@ exports.login = async (req, res, next) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    res.success(StatusCodes.OK, "Login successful", { user: { userId: user._id, email: user.email }, accessToken });
+    res.success(StatusCodes.OK, "Login successful", { user: { userId: user._id, email: user.email, username: user.username, name: user.name, profilePhoto: user?.profilePhoto | null }, accessToken });
   } catch (err) {
     next(err);
   }
@@ -170,6 +170,7 @@ exports.googleAuth = async (req, res, next) => {
         name: user.name,
         email: user.email,
         profilePhoto: user.profilePhoto,
+        username: user.username,
       },
     });
   } catch (error) {

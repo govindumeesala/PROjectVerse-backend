@@ -1,5 +1,5 @@
 const express = require("express");
-const { signup, login, googleAuth, logout, refresh } = require("../controllers/authController");
+const { signup, login, googleAuth, logout, refresh, checkUsername } = require("../controllers/authController");
 const User = require("../models/User");
 const { StatusCodes } = require("http-status-codes");
 
