@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { createProject, getMyProjects, getProjectById, getContributedProjects } = require("../controllers/projectController");
+const { createProject, getMyProjects, getProjectById, getContributedProjects,getProjectPage, requestToJoin, updateProject } = require("../controllers/projectController");
 const { protect } = require("../middleware/authMiddleware");
 const  pagination = require("../middleware/pagination");
 const multer = require("multer");
@@ -47,5 +47,13 @@ router.put("/:id/unlike", protect, unlikeProject);
 router.post("/:id/comments", protect, addComment);
 router.get("/:id/comments", protect, getCommentsByProject);
 
+// Public route - anyone can view
+router.get("/:username/:projectTitle", getProjectPage);
+
+// Auth required - request to join
+router.post("/:username/:projectTitle/join", protect, requestToJoin);
+
+// Auth required & must be owner - update
+router.put("/:username/:projectTitle", protect, updateProject);
 
 module.exports = router;
