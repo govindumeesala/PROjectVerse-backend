@@ -21,15 +21,13 @@ exports.getUserDetails = async (req, res, next) => {
 
     // Select only the required fields. Using .lean() returns a plain JS object (faster).
     const user = await User.findById(userId)
-      .select("_id name email idNumber year summary profilePhoto socials")
+      .select("_id name email idNumber year summary profilePhoto socials username")
       .lean();
 
     if (!user) {
       return next(new AppError("User not found", StatusCodes.NOT_FOUND));
     }
 
-    // Use your res.success helper which expects (data, message?, statusCode?)
-    // Send a minimal object (avoid leaking internal DB fields)
     return res.success(StatusCodes.OK, "User details retrieved successfully", user);
   } catch (err) {
     next(err);
