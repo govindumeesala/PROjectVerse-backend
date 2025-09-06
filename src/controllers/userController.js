@@ -13,7 +13,7 @@ const AppError = require('../utils/AppError');
 // GET /api/users   (get logged-in user's basic profile)
 exports.getUserDetails = async (req, res, next) => {
   try {
-    // req.user is populated by your protect middleware
+    // req.user is populated by your protect middleware 
     const userId = req.user?.userId;
     if (!userId) {
       return next(new AppError("Unauthorized", StatusCodes.UNAUTHORIZED));
@@ -26,6 +26,36 @@ exports.getUserDetails = async (req, res, next) => {
 
     if (!user) {
       return next(new AppError("User not found", StatusCodes.NOT_FOUND));
+    }
+
+    return res.success(StatusCodes.OK, "User details retrieved successfully", user);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getUserDetailsByUsername = async (req, res, next) => {
+  try {
+    const { username } = req.params;
+
+    if (!username) {
+      return next(new AppError("Invalid username", StatusCodes.BAD_REQUEST));
+    }
+
+    const loggedInUserId = req.user?.userId;
+
+    const user = await User.findOne({ username })
+      .select("_id name email idNumber year summary profilePhoto socials username")
+      .lean();
+
+    if (!user) {
+      return next(new AppError("User not found", StatusCodes.NOT_FOUND));
+    }
+
+    if (loggedInUserId && loggedInUserId.toString() === user._id.toString()) {
+      user.isOwner = true;
+    } else {
+      user.isOwner = false;
     }
 
     return res.success(StatusCodes.OK, "User details retrieved successfully", user);
@@ -110,13 +140,22 @@ exports.getAllUsers = async (req, res, next) => {
   }
 };
 
-// GET /api/users/stats (get logged-in user's stats)
-exports.getMyStats = async (req, res, next) => {
+// GET /api/users/stats
+exports.getUserStats = async (req, res, next) => {
   try {
-    const uid = req.user && req.user.userId;
-    if (!uid) {
-      return next(new AppError("Unauthorized: missing user id", StatusCodes.UNAUTHORIZED));
+    const username = req.params.username;
+    if (!username) {
+      return next(new AppError("username not provided", StatusCodes.BAD_REQUEST));
     }
+
+    const user = await User.findOne({ username }).select("_id").lean();
+    if (!user) {
+      return next(new AppError("User not found", StatusCodes.NOT_FOUND));
+    }
+
+    const uid = user._id;
+
+    const loggedInUserId = req.user?.userId;
 
     // Project counts: active & completed
     const [activeProjects, completedProjects] = await Promise.all([
@@ -148,6 +187,7 @@ exports.getMyStats = async (req, res, next) => {
       collaborationsCount: collaborationsCount || 0,
       contributionsCount: contributionsCount || 0,
       bookmarksCount,
+      isOwner: loggedInUserId && loggedInUserId.toString() === uid.toString(),
     };
 
     return res.success(StatusCodes.OK, "User stats retrieved successfully", stats);
@@ -165,12 +205,14 @@ exports.getMyStats = async (req, res, next) => {
  */
 exports.getBookmarks = async (req, res, next) => {
   try {
-    const userId = req.user && req.user.userId;
-    if (!userId) throw new AppError("Authentication required", StatusCodes.UNAUTHORIZED);
+    const username = req.params.username;
+    if (!username) throw new AppError("username not provided", StatusCodes.BAD_REQUEST);
+
+    const loggedInUserId = req?.user?.userId;
 
     const { page, limit, skip, filters } = req.paging;
 
-    const user = await User.findById(userId).select("bookmarks").lean();
+    const user = await User.findOne({ username }).select("bookmarks").lean();
     if (!user) throw new AppError("User not found", StatusCodes.NOT_FOUND);
 
     const bookmarkIds = user.bookmarks || [];
@@ -233,6 +275,7 @@ exports.getBookmarks = async (req, res, next) => {
       total,
       page,
       limit,
+      isOwner: loggedInUserId && loggedInUserId.toString() === user._id.toString(),
     });
   } catch (err) {
     next(err);

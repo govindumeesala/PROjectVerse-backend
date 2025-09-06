@@ -128,26 +128,6 @@ exports.checkTitle = async (req, res) => {
   }
 };
 
-
-// GET USER PROJECTS
-exports.getMyProjects = async (req, res, next) => {
-  try {
-    const userId = req.user.userId;
-
-    const projects = await Project.find({ owner: userId })
-      .sort({ createdAt: -1 })
-      .select("title description createdAt status techStack");
-
-    return res.success(
-      StatusCodes.OK,
-      "User projects retrieved successfully",
-      projects
-    );
-  } catch (err) {
-    next(err);
-  }
-};
-
 // GET PROJECT BY ID
 exports.getProjectById = async (req, res, next) => {
   try {
@@ -369,16 +349,20 @@ exports.unlikeProject = async (req, res, next) => {
 /**
  * GET /api/project/my-projects
  */
-exports.getMyProjects = async (req, res, next) => {
+exports.getUserProjects = async (req, res, next) => {
   try {
-    const userId = req.user && req.user.userId;
-    if (!userId)
-      throw new AppError("Authentication required", StatusCodes.UNAUTHORIZED);
+    const { username } = req.params;
+    if (!username) {
+      return next(new AppError("Invalid username", StatusCodes.BAD_REQUEST));
+    }
+    const loggedInUserId = req?.user?.userId || null;
 
     const { page, limit, skip, filters } = req.paging;
 
+    const user = await User.findOne({ username }).select("_id").lean();
+
     const baseFilter = {
-      owner: new mongoose.Types.ObjectId(userId),
+      owner: new mongoose.Types.ObjectId(user._id),
       ...filters,
     };
 
@@ -432,6 +416,7 @@ exports.getMyProjects = async (req, res, next) => {
       total,
       page,
       limit,
+      isOwner: loggedInUserId && loggedInUserId.toString() === user._id.toString(),
     });
   } catch (err) {
     next(err);
@@ -443,11 +428,20 @@ exports.getMyProjects = async (req, res, next) => {
  */
 exports.getContributedProjects = async (req, res, next) => {
   try {
-    const userId = req.user && req.user.userId;
-    if (!userId)
-      throw new AppError("Authentication required", StatusCodes.UNAUTHORIZED);
+    const { username } = req.params;
+    if (!username) {
+      return next(new AppError("Invalid username", StatusCodes.BAD_REQUEST));
+    }
+    const loggedInUserId = req?.user?.userId;
 
     const { page, limit, skip, filters } = req.paging;
+
+    const user = await User.findOne({ username }).select("_id");
+    if (!user) {
+      throw new AppError("user not found", StatusCodes.NOT_FOUND);
+    }
+
+    const userId = user._id;
 
     // Find collaborations where collaborator == userId
     const collaborationsByUser = await Collaboration.find({
@@ -464,6 +458,7 @@ exports.getContributedProjects = async (req, res, next) => {
         total: 0,
         page,
         limit,
+        isOwner: loggedInUserId && loggedInUserId.toString() === userId.toString(),
       });
     }
 
@@ -518,6 +513,7 @@ exports.getContributedProjects = async (req, res, next) => {
       total,
       page,
       limit,
+      isOwner: loggedInUserId && loggedInUserId.toString() === userId.toString(),
     });
   } catch (err) {
     next(err);
