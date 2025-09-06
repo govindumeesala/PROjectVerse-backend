@@ -1,7 +1,7 @@
 // routes/userRoute.js
 const express = require("express");
 const userController = require("../controllers/userController");
-const { protect } = require("../middleware/authMiddleware");
+const { protect, optionalAuth } = require("../middleware/authMiddleware");
 const { validateUserUpdate } = require("../middleware/validators");
 const pagination = require("../middleware/pagination");
 const multer = require("multer");
@@ -10,6 +10,9 @@ const router = express.Router();
 
 // GET /api/user - fetches details for the logged-in user
 router.get("/", protect, userController.getUserDetails);
+
+// get user details by username public route
+router.get("/:username", optionalAuth, userController.getUserDetailsByUsername);
 
 // Use multer memory storage so that file is available in req.file.buffer
 const storage = multer.memoryStorage();
@@ -21,11 +24,11 @@ router.put("/", protect, validateUserUpdate, upload.single("profilePhoto"), user
 // GET /api/user/all - fetches all users
 router.get("/all", protect, userController.getAllUsers);
 
-// GET /api/user/stats - new stats endpoint
-router.get("/stats", protect, userController.getMyStats);
+// GET /api/user/stats - profile
+router.get("/stats/:username", optionalAuth, userController.getUserStats);
 
-// GET bookmarked projects
-router.get("/bookmarks", protect, pagination(), userController.getBookmarks);
+// GET bookmarked projects - profile
+router.get("/bookmarks/:username", optionalAuth, pagination(), userController.getBookmarks);
 
 // PUT toggle bookmark
 router.put("/bookmarks/:projectId", protect, userController.toggleBookmark);

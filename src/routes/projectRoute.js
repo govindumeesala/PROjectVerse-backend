@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const { createProject, getMyProjects, getProjectById, getContributedProjects,getProjectPage, requestToJoin, updateProject } = require("../controllers/projectController");
-const { protect } = require("../middleware/authMiddleware");
+const { createProject, getUserProjects, getProjectById, getContributedProjects,getProjectPage, requestToJoin, updateProject } = require("../controllers/projectController");
+const { protect, optionalAuth } = require("../middleware/authMiddleware");
 const  pagination = require("../middleware/pagination");
 const multer = require("multer");
 const {
@@ -24,11 +24,11 @@ const upload = multer({ storage });
 router.post("/create", protect, upload.single("projectPhoto"), createProject);
 router.post("/check-title", protect, checkTitle);
 
-// GET /api/projects/my-projects
-router.get("/my-projects", protect, pagination(), getMyProjects);
+// GET /api/projects/user-projects - profile
+router.get("/user-projects/:username", optionalAuth, pagination(), getUserProjects);
 
-// GET /api/projects/contributed
-router.get("/contributed", protect, pagination(), getContributedProjects);
+// GET /api/projects/contributed - profile
+router.get("/contributed/:username", optionalAuth, pagination(), getContributedProjects);
 
 // FEED
 router.get("/feed", protect, getProjectFeed);
