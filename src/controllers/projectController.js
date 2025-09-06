@@ -8,6 +8,7 @@ const { StatusCodes } = require("http-status-codes");
 const AppError = require("../utils/AppError"); // ✅ custom error class (if you have one)
 const mongoose = require("mongoose");
 const Types = require("mongoose");
+const projectService = require("../services/projectServices");
 
 // Helper: upload buffer to Cloudinary
 const uploadBufferToCloudinary = (buffer) => {
@@ -154,149 +155,21 @@ exports.getProjectFeed = async (req, res, next) => {
     const userId = req.user?.userId
       ? new mongoose.Types.ObjectId(req.user.userId)
       : null;
-
-    let match = {};
-
-    // 1. Handle cursor-based pagination
-    if (cursor) {
-      match.createdAt = { $lt: new Date(cursor) };
-    }
-
-    // 2. Handle techStack filter
-    let techStackArray = [];
-    if (techStack) {
-      // Check if it's an array from the frontend or a comma-separated string
-      techStackArray = Array.isArray(techStack)
-        ? techStack
-        : techStack.split(",").map((s) => s.trim());
-      if (techStackArray.length > 0) {
-        match.techStack = { $in: techStackArray };
-      }
-    }
-
-    // 3. Handle domain filter
-    let domainArray = [];
-    if (domain) {
-      domainArray = Array.isArray(domain)
-        ? domain
-        : domain.split(",").map((s) => s.trim());
-      if (domainArray.length > 0) {
-        match.domain = { $in: domainArray };
-      }
-    }
-
-    // 4. Handle search filter
-    if (search) {
-      match.$or = [
-        { title: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
-      ];
-    }
-
-    // The rest of your aggregation pipeline is already performant.
-    const projects = await Project.aggregate([
-      { $match: match },
-      { $sort: { createdAt: -1 } },
-      { $limit: Number(limit) + 1 },
-
-      {
-        $lookup: {
-          from: "users",
-          localField: "owner",
-          foreignField: "_id",
-          as: "owner",
-          pipeline: [{ $project: { name: 1, profilePhoto: 1 } }],
-        },
-      },
-      { $unwind: "$owner" },
-      
-      {
-        $lookup: {
-          from: "collaborations", // The collection that links projects and collaborators
-          localField: "_id",
-          foreignField: "project",
-          as: "collaborations",
-          pipeline: [
-            // Join the collaborator user data within the sub-pipeline
-            {
-              $lookup: {
-                from: "users",
-                localField: "collaborator",
-                foreignField: "_id",
-                as: "collaborator",
-                pipeline: [{ $project: { name:1, profilePhoto:1, _id:1 } }],
-              },
-            },
-            { $unwind: "$collaborator" },
-            { $replaceRoot: { newRoot: "$collaborator" } }
-          ],
-        },
-      },
-      
-      {
-        $lookup: {
-          from: "comments",
-          let: { projectId: "$_id" },
-          pipeline: [
-            { $match: { $expr: { $eq: ["$project", "$$projectId"] } } },
-            { $count: "count" },
-          ],
-          as: "commentsCount",
-        },
-      },
-      {
-        $addFields: {
-          commentsCount: {
-            $ifNull: [{ $arrayElemAt: ["$commentsCount.count", 0] }, 0],
-          },
-        },
-      },
-      {
-        $addFields: {
-          likesCount: { $size: { $ifNull: ["$likes", []] } },
-          likedByUser: {
-            $cond: [
-              userId ? { $in: [userId, { $ifNull: ["$likes", []] }] } : false,
-              true,
-              false,
-            ],
-          },
-        },
-      },
-      ...(userId
-        ? [
-            {
-              $lookup: {
-                from: "users",
-                localField: "_id",
-                foreignField: "bookmarks",
-                as: "bookmarkedUsers",
-                pipeline: [{ $match: { _id: userId } }],
-              },
-            },
-            {
-              $addFields: {
-                bookmarkedByUser: { $gt: [{ $size: "$bookmarkedUsers" }, 0] },
-              },
-            },
-            { $project: { bookmarkedUsers: 0 } },
-          ]
-        : [{ $addFields: { bookmarkedByUser: false } }]),
-    ]);
-
-    let nextCursor = null;
-    let finalProjects = projects;
-
-    if (projects.length > limit) {
-      nextCursor = projects[limit - 1].createdAt;
-      finalProjects = projects.slice(0, limit);
-    }
-
-    return res.status(200).json({
+    console.log("User ID:", userId);
+    const { projects, nextCursor } = await projectService.getProjectFeed({
+      userId,
+      cursor,
+      limit: Number(limit),
+      techStack,
+      domain,
+      search,
+    });
+    console.log("Projects:", projects);
+    res.status(StatusCodes.OK).json({
       success: true,
       message: "Projects retrieved successfully",
       data: {
-        projects: finalProjects,
+        projects,
         nextCursor,
       },
     });
@@ -304,6 +177,7 @@ exports.getProjectFeed = async (req, res, next) => {
     next(err);
   }
 };
+
 
 // LIKE PROJECT
 exports.likeProject = async (req, res, next) => {
@@ -514,6 +388,51 @@ exports.getContributedProjects = async (req, res, next) => {
       page,
       limit,
       isOwner: loggedInUserId && loggedInUserId.toString() === userId.toString(),
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getProjectPage = async (req, res, next) => {
+  try {
+    const { username, projectTitle } = req.params;
+    const project = await projectService.getProjectByUsernameAndTitle(username, projectTitle);
+
+    res.status(StatusCodes.OK).json({ success: true, data: project });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.requestToJoin = async (req, res, next) => {
+  try {
+    const { username, projectTitle } = req.params;
+    const userId = req.user.userId;
+
+    const request = await projectService.requestToJoinProject(userId, username, projectTitle);
+
+    res.status(StatusCodes.CREATED).json({
+      success: true,
+      message: "Join request submitted successfully",
+      data: request,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.updateProject = async (req, res, next) => {
+  try {
+    const { username, projectTitle } = req.params;
+    const userId = req.user.userId;
+
+    const project = await projectService.updateProject(userId, username, projectTitle, req.body);
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: "Project updated successfully",
+      data: project,
     });
   } catch (err) {
     next(err);
