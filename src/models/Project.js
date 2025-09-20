@@ -17,8 +17,10 @@ const projectSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
-projectSchema.index({ title: 1 }, { unique: true, collation: { locale: 'en', strength: 2 } });
-
+projectSchema.index(
+  { owner: 1, title: 1 },
+  { unique: true, collation: { locale: "en", strength: 2 } }
+);
 
 
 module.exports = mongoose.model("Project", projectSchema);

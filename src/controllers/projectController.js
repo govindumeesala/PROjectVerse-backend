@@ -95,13 +95,10 @@ exports.createProject = async (req, res, next) => {
       );
     }
 
-    return res.status(201).json({
-      success: true,
-      message: "Project created successfully",
-      data: newProject,
-    });
+    return res.success(StatusCodes.CREATED , "Project created successfully", newProject);
   } catch (err) {
     if (err.code === 11000 && err.keyPattern?.title) {
+      console.error(err);
       return res.status(400).json({
         success: false,
         message: "You already have a project with this title. Choose another.",
@@ -165,13 +162,10 @@ exports.getProjectFeed = async (req, res, next) => {
       search,
     });
     console.log("Projects:", projects);
-    res.status(StatusCodes.OK).json({
-      success: true,
-      message: "Projects retrieved successfully",
-      data: {
-        projects,
-        nextCursor,
-      },
+
+    return res.success(StatusCodes.OK, "Projects retrieved successfully", {
+      projects,
+      nextCursor,
     });
   } catch (err) {
     next(err);

@@ -11,6 +11,9 @@ const router = express.Router();
 // GET /api/user - fetches details for the logged-in user
 router.get("/", protect, userController.getUserDetails);
 
+// GET /api/user/all - fetches all users
+router.get("/all", protect, userController.getAllUsers);
+
 // get user details by username public route
 router.get("/:username", optionalAuth, userController.getUserDetailsByUsername);
 
@@ -20,9 +23,6 @@ const upload = multer({ storage });
 
 // PATCH /api/user - update user profile with image upload
 router.put("/", protect, validateUserUpdate, upload.single("profilePhoto"), userController.updateUser);
-
-// GET /api/user/all - fetches all users
-router.get("/all", protect, userController.getAllUsers);
 
 // GET /api/user/stats - profile
 router.get("/stats/:username", optionalAuth, userController.getUserStats);

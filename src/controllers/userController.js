@@ -129,7 +129,7 @@ exports.updateUser = async (req, res, next) => {
 // controllers/userController.js or similar
 exports.getAllUsers = async (req, res, next) => {
   try {
-    const users = await User.find({}, "name email _id");
+    const users = await User.find({}, "name email _id").lean();
 
     if (users.length === 0) {
       throw new AppError("No users found", StatusCodes.NOT_FOUND);
