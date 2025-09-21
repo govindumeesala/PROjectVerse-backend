@@ -1,9 +1,20 @@
 const { StatusCodes } = require("http-status-codes");
 
+// Safe chalk import for CJS environments
 let chalk;
-(async () => {
-  chalk = (await import("chalk")).default;
-})();
+try {
+  chalk = require("chalk");
+} catch (e) {
+  // Final fallback: no-op color functions
+  chalk = {
+    white: (s) => s,
+    red: (s) => s,
+    yellow: (s) => s,
+    cyan: (s) => s,
+    green: (s) => s,
+    gray: (s) => s,
+  };
+}
 
 exports.successHandler = (req, res, next) => {
   res.success = (
@@ -18,17 +29,17 @@ exports.successHandler = (req, res, next) => {
     });
   };
 
-  // Unified logger (colored)
+  // Unified logger (colored) with safe invocation
   res.on("finish", () => {
-    let color = chalk.white;
-    if (res.statusCode >= 500) color = chalk.red;
-    else if (res.statusCode >= 400) color = chalk.yellow;
-    else if (res.statusCode >= 300) color = chalk.cyan;
-    else if (res.statusCode >= 200) color = chalk.green;
+    let colorName = "white";
+    if (res.statusCode >= 500) colorName = "red";
+    else if (res.statusCode >= 400) colorName = "yellow";
+    else if (res.statusCode >= 300) colorName = "cyan";
+    else if (res.statusCode >= 200) colorName = "green";
 
-    console.log(
-      color(`${req.method} ${req.originalUrl} → ${res.statusCode}`)
-    );
+    const msg = `${req.method} ${req.originalUrl} → ${res.statusCode}`;
+    const fn = chalk && typeof chalk[colorName] === "function" ? chalk[colorName] : null;
+    console.log(fn ? fn(msg) : msg);
   });
 
   next();
@@ -39,8 +50,10 @@ exports.errorHandler = (err, req, res, next) => {
     return next(err);
   }
 
-  console.error(chalk.red("❌ Error:"), chalk.red(err.message));
-  console.error(chalk.gray(err.stack));
+  const red = chalk && typeof chalk.red === "function" ? chalk.red : (s) => s;
+  const gray = chalk && typeof chalk.gray === "function" ? chalk.gray : (s) => s;
+  console.error(red("❌ Error:"), red(err.message));
+  if (err.stack) console.error(gray(err.stack));
 
   res.status(err.statusCode || StatusCodes.INTERNAL_SERVER_ERROR).json({
     success: false,

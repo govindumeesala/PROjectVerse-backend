@@ -7,8 +7,9 @@ const streamifier = require("streamifier");
 const { StatusCodes } = require("http-status-codes");
 const AppError = require("../utils/AppError"); // ✅ custom error class (if you have one)
 const mongoose = require("mongoose");
-const Types = require("mongoose");
 const projectService = require("../services/projectServices");
+const slugify = require("slugify");
+const catchAsync = require("../utils/catchAsync");
 
 // Helper: upload buffer to Cloudinary
 const uploadBufferToCloudinary = (buffer) => {
@@ -108,13 +109,24 @@ exports.createProject = async (req, res, next) => {
   }
 };
 
-//API for checking Availability
+
 exports.checkTitle = async (req, res) => {
   try {
     const owner = req.user.userId;
     const { title } = req.body;
 
-    const exists = await Project.findOne({ owner, title: { $regex: new RegExp(`^${title}$`, 'i') } });
+    if (!title) {
+      return res
+        .status(400)
+        .json({ available: false, message: "Title is required" });
+    }
+
+    // 🔑 Generate slug from title
+    const slug = slugify(title, { lower: true, strict: true });
+
+    // 🔎 Check if a project with same slug exists for this owner
+    const exists = await Project.findOne({ owner, slug });
+
     return res.json({
       available: !exists,
       message: exists
@@ -122,7 +134,10 @@ exports.checkTitle = async (req, res) => {
         : "This title is available.",
     });
   } catch (err) {
-    return res.status(500).json({ available: false, message: "Server error" });
+    console.error("Error checking title:", err);
+    return res
+      .status(500)
+      .json({ available: false, message: "Server error" });
   }
 };
 
@@ -152,7 +167,6 @@ exports.getProjectFeed = async (req, res, next) => {
     const userId = req.user?.userId
       ? new mongoose.Types.ObjectId(req.user.userId)
       : null;
-    console.log("User ID:", userId);
     const { projects, nextCursor } = await projectService.getProjectFeed({
       userId,
       cursor,
@@ -161,11 +175,13 @@ exports.getProjectFeed = async (req, res, next) => {
       domain,
       search,
     });
-    console.log("Projects:", projects);
-
-    return res.success(StatusCodes.OK, "Projects retrieved successfully", {
-      projects,
-      nextCursor,
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: "Projects retrieved successfully",
+      data: {
+        projects,
+        nextCursor,
+      },
     });
   } catch (err) {
     next(err);
@@ -390,38 +406,107 @@ exports.getContributedProjects = async (req, res, next) => {
 
 exports.getProjectPage = async (req, res, next) => {
   try {
-    const { username, projectTitle } = req.params;
-    const project = await projectService.getProjectByUsernameAndTitle(username, projectTitle);
+    const { username, slug } = req.params;
+    const userId = req.user?.userId || null;
+    const project = await projectService.getProjectByUsernameAndSlug(
+      username,
+      slug,
+      userId
+    );
 
-    res.status(StatusCodes.OK).json({ success: true, data: project });
-  } catch (err) {
-    next(err);
-  }
-};
+    // 🔑 add isOwner flag (compare logged-in user id with project.owner._id)
+    const isOwner = userId && project.owner._id.toString() === userId.toString();
 
-exports.requestToJoin = async (req, res, next) => {
-  try {
-    const { username, projectTitle } = req.params;
-    const userId = req.user.userId;
+    // Compute alreadyRequested using ProjectRequest collection
+    let alreadyRequested = false;
+    let alreadyContributor = false;
+    if (userId) {
+      const ProjectRequest = require("../models/ProjectRequest");
+      const Collaboration = require("../models/Collaboration");
+      const [pending, collab] = await Promise.all([
+        ProjectRequest.findOne({
+          project: project._id,
+          requester: userId,
+          status: "pending",
+        }).lean(),
+        Collaboration.findOne({ project: project._id, collaborator: userId }).lean(),
+      ]);
+      alreadyRequested = Boolean(pending);
+      alreadyContributor = Boolean(collab);
+    }
 
-    const request = await projectService.requestToJoinProject(userId, username, projectTitle);
+    // If owner, include pending requests with basic requester details for UI
+    let requests = [];
+    if (isOwner) {
+      const ProjectRequest = require("../models/ProjectRequest");
+      const pendingRequests = await ProjectRequest.find({
+        project: project._id,
+        status: "pending",
+      })
+        .populate("requester", "username name profilePhoto")
+        .lean();
+      requests = pendingRequests.map((r) => ({
+        _id: r._id,
+        user: {
+          _id: r.requester?._id,
+          username: r.requester?.username,
+          name: r.requester?.name,
+          profilePhoto: r.requester?.profilePhoto,
+        },
+        roleRequested: r.roleRequested,
+        message: r.message,
+      }));
+    }
 
-    res.status(StatusCodes.CREATED).json({
+    res.status(StatusCodes.OK).json({
       success: true,
-      message: "Join request submitted successfully",
-      data: request,
+      data: { ...project, isOwner, alreadyRequested, alreadyContributor, requests },
     });
   } catch (err) {
     next(err);
   }
 };
+exports.requestToJoin = catchAsync(async (req, res) => {
+  const { username, slug } = req.params;
+  const { message, roleRequested } = req.body;
+  const request = await projectService.requestToJoinProject(
+    req.user.userId,
+    username,
+    slug,
+    message,
+    roleRequested
+  );
+
+  res.status(201).json({
+    success: true,
+    message: "Join request sent",
+    request,
+  });
+});
+
+exports.respondToRequest = catchAsync(async (req, res) => {
+  const { requestId } = req.params;
+  const { action } = req.body;
+
+  const result = await projectService.respondToRequest(
+    req.user.userId,
+    requestId,
+    action
+  );
+
+  res.status(200).json({
+    success: true,
+    ...result,
+  });
+});
+
 
 exports.updateProject = async (req, res, next) => {
   try {
-    const { username, projectTitle } = req.params;
+    const { username, slug } = req.params;
     const userId = req.user.userId;
 
-    const project = await projectService.updateProject(userId, username, projectTitle, req.body);
+    const project = await projectService.updateProject(userId, username, slug, req.body);
 
     res.status(StatusCodes.OK).json({
       success: true,

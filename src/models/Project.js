@@ -1,7 +1,9 @@
 const mongoose = require("mongoose");
+const slugify = require("slugify");
 
 const projectSchema = new mongoose.Schema({
   title: { type: String, required: true },
+  slug:{type:String, required:true},
   description: { type: String, required: true },
   domain: [{ type: String, required: true }], // e.g., Web Dev, AI, etc.
   techStack: [{ type: String, required: true }], // e.g., ["React", "Node.js", "MongoDB"]
@@ -16,6 +18,13 @@ const projectSchema = new mongoose.Schema({
   // contributors: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // Contributors should get only from collaborations model
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
+});
+
+projectSchema.pre("validate", function (next) {
+  if (this.isModified("title") || this.isNew) {
+    this.slug = slugify(this.title, { lower: true, strict: true });
+  }
+  next();
 });
 projectSchema.index(
   { owner: 1, title: 1 },

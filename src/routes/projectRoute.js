@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { createProject, getUserProjects, getProjectById, getContributedProjects,getProjectPage, requestToJoin, updateProject } = require("../controllers/projectController");
+const { createProject, getUserProjects, getProjectById, getContributedProjects,getProjectPage, requestToJoin, updateProject, respondToRequest } = require("../controllers/projectController");
 const { protect, optionalAuth } = require("../middleware/authMiddleware");
 const  pagination = require("../middleware/pagination");
 const multer = require("multer");
@@ -33,27 +33,27 @@ router.get("/contributed/:username", optionalAuth, pagination(), getContributedP
 // FEED
 router.get("/feed", protect, getProjectFeed);
 
-// routes/projectRoutes.js
+// Public route - anyone can view (place BEFORE generic :id routes)
+router.get("/:username/:slug", optionalAuth, getProjectPage);
+
+// routes using :id below
 router.get("/:id", protect, getProjectById);
 
 // LIKE
 router.put("/:id/like", protect, likeProject);
 router.put("/:id/unlike", protect, unlikeProject);
 
-// // SHARE → Just reuse getProjectById
-// router.get("/:id", protect, getProjectById);
-
 // COMMENTS
 router.post("/:id/comments", protect, addComment);
 router.get("/:id/comments", protect, getCommentsByProject);
 
-// Public route - anyone can view
-router.get("/:username/:projectTitle", getProjectPage);
-
 // Auth required - request to join
-router.post("/:username/:projectTitle/join", protect, requestToJoin);
+router.post("/:username/:slug/join", protect, requestToJoin);
 
 // Auth required & must be owner - update
-router.put("/:username/:projectTitle", protect, updateProject);
+router.put("/:username/:slug", protect, updateProject);
+
+// Auth required & must be owner - respond to join request
+router.patch("/:username/:slug/respond-to-request/:requestId", protect, respondToRequest);
 
 module.exports = router;
