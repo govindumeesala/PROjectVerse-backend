@@ -116,9 +116,7 @@ exports.checkTitle = async (req, res) => {
     const { title } = req.body;
 
     if (!title) {
-      return res
-        .status(400)
-        .json({ available: false, message: "Title is required" });
+      return res.success(400, "Title is required", { available: false });
     }
 
     // 🔑 Generate slug from title
@@ -127,17 +125,12 @@ exports.checkTitle = async (req, res) => {
     // 🔎 Check if a project with same slug exists for this owner
     const exists = await Project.findOne({ owner, slug });
 
-    return res.json({
+    return res.success(200, exists ? "You already used this title." : "This title is available.", {
       available: !exists,
-      message: exists
-        ? "You already used this title."
-        : "This title is available.",
     });
   } catch (err) {
     console.error("Error checking title:", err);
-    return res
-      .status(500)
-      .json({ available: false, message: "Server error" });
+    return res.success(500, "Server error", { available: false });
   }
 };
 
@@ -149,7 +142,7 @@ exports.getProjectById = async (req, res, next) => {
       .populate("contributors.user", "name email profilePhoto");
 
     if (!project) {
-      throw new AppError("Project not found", StatusCodes.NOT_FOUND);
+      return res.success(404, "Project not found", null);
     }
 
     return res.success(StatusCodes.OK, "Project details retrieved", project);
@@ -458,14 +451,18 @@ exports.getProjectPage = async (req, res, next) => {
       }));
     }
 
-    res.status(StatusCodes.OK).json({
-      success: true,
-      data: { ...project, isOwner, alreadyRequested, alreadyContributor, requests },
+    return res.success(StatusCodes.OK, "Project page retrieved", {
+      ...project,
+      isOwner,
+      alreadyRequested,
+      alreadyContributor,
+      requests,
     });
   } catch (err) {
     next(err);
   }
 };
+
 exports.requestToJoin = catchAsync(async (req, res) => {
   const { username, slug } = req.params;
   const { message, roleRequested } = req.body;
@@ -477,11 +474,7 @@ exports.requestToJoin = catchAsync(async (req, res) => {
     roleRequested
   );
 
-  res.status(201).json({
-    success: true,
-    message: "Join request sent",
-    request,
-  });
+  return res.success(201, "Join request sent", request);
 });
 
 exports.respondToRequest = catchAsync(async (req, res) => {
@@ -494,12 +487,8 @@ exports.respondToRequest = catchAsync(async (req, res) => {
     action
   );
 
-  res.status(200).json({
-    success: true,
-    ...result,
-  });
+  return res.success(200, "Request response processed", result);
 });
-
 
 exports.updateProject = async (req, res, next) => {
   try {
@@ -508,11 +497,7 @@ exports.updateProject = async (req, res, next) => {
 
     const project = await projectService.updateProject(userId, username, slug, req.body);
 
-    res.status(StatusCodes.OK).json({
-      success: true,
-      message: "Project updated successfully",
-      data: project,
-    });
+    return res.success(StatusCodes.OK, "Project updated successfully", project);
   } catch (err) {
     next(err);
   }
