@@ -33,6 +33,10 @@ router.get("/contributed/:username", optionalAuth, pagination(), getContributedP
 // FEED
 router.get("/feed", protect, getProjectFeed);
 
+// COMMENTS must come BEFORE the generic "/:username/:slug" route to avoid conflicts
+router.post("/:id/comments", protect, addComment);
+router.get("/:id/comments", protect, getCommentsByProject);
+
 // Public route - anyone can view (place BEFORE generic :id routes)
 router.get("/:username/:slug", optionalAuth, getProjectPage);
 
@@ -42,10 +46,6 @@ router.get("/:id", protect, getProjectById);
 // LIKE
 router.put("/:id/like", protect, likeProject);
 router.put("/:id/unlike", protect, unlikeProject);
-
-// COMMENTS
-router.post("/:id/comments", protect, addComment);
-router.get("/:id/comments", protect, getCommentsByProject);
 
 // Auth required - request to join
 router.post("/:username/:slug/join", protect, requestToJoin);

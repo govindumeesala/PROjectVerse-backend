@@ -27,8 +27,8 @@ projectSchema.pre("validate", function (next) {
   next();
 });
 projectSchema.index(
-  { owner: 1, title: 1 },
-  { unique: true, collation: { locale: "en", strength: 2 } }
+  { owner: 1, slug: 1 },
+  { unique: true }
 );
 
 

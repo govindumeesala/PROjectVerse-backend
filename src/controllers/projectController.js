@@ -34,19 +34,22 @@ exports.createProject = async (req, res, next) => {
     const {
       title,
       description,
-      domain,
       githubURL,
       deploymentURL,
       status,
-      techStack,
-      contributors = [], // The array of user IDs from the frontend
       lookingForContributors,
       additionalURL,
     } = req.body;
 
+    // Normalize possible single values to arrays and accept both field and field[] keys
+    const toArray = (v) => (Array.isArray(v) ? v : v !== undefined ? [v] : []);
+    const domain = toArray(req.body.domain ?? req.body["domain[]"]);
+    const techStack = toArray(req.body.techStack ?? req.body["techStack[]"]);
+    const contributors = toArray(req.body.contributors ?? req.body["contributors[]"]);
+
     let projectPhotoUrl;
 
-    // ✅ handle image upload (no change here, this is correct)
+    // handle image upload (no change here, this is correct)
     if (req.file) {
       const processedBuffer = await sharp(req.file.buffer)
         .resize(500, 300)
@@ -61,7 +64,7 @@ exports.createProject = async (req, res, next) => {
       title,
       description,
       domain,
-      techStack, // Already an array from the frontend
+      techStack, // normalized to array
       githubURL,
       deploymentURL,
       status,
@@ -116,21 +119,27 @@ exports.checkTitle = async (req, res) => {
     const { title } = req.body;
 
     if (!title) {
-      return res.success(400, "Title is required", { available: false });
+      return res.success(400, "Title is required", { available: false, exists: false });
     }
 
     // 🔑 Generate slug from title
     const slug = slugify(title, { lower: true, strict: true });
 
-    // 🔎 Check if a project with same slug exists for this owner
-    const exists = await Project.findOne({ owner, slug });
-
-    return res.success(200, exists ? "You already used this title." : "This title is available.", {
-      available: !exists,
-    });
+    // 🔎 Efficient existence check for owner+slug
+    const existsDoc = await Project.exists({ owner, slug });
+    const exists = !!existsDoc;
+    return res.success(
+      200,
+      exists ? "You already used this title." : "This title is available.",
+      {
+        exists,
+        available: !exists,
+        slug,
+      }
+    );
   } catch (err) {
     console.error("Error checking title:", err);
-    return res.success(500, "Server error", { available: false });
+    return res.success(500, "Server error", { available: false, exists: false });
   }
 };
 
@@ -399,6 +408,7 @@ exports.getContributedProjects = async (req, res, next) => {
 
 exports.getProjectPage = async (req, res, next) => {
   try {
+    console.log(req)
     const { username, slug } = req.params;
     const userId = req.user?.userId || null;
     const project = await projectService.getProjectByUsernameAndSlug(
