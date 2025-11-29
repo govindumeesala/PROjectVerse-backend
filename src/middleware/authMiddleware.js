@@ -32,7 +32,6 @@ exports.optionalAuth = (req, res, next) => {
       // don’t block the request — just don’t set req.user
     }
   }
-
   // if no token → req.user stays undefined
   next();
 };

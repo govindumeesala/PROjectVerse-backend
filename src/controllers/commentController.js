@@ -3,6 +3,7 @@ const Comment = require("../models/Comment");
 const Project = require("../models/Project");
 const mongoose = require("mongoose");
 const {StatusCodes} = require("http-status-codes");
+const { notifyProjectCommented } = require("../services/notificationService");
 
 // Add comment
 exports.addComment = async (req, res, next) => {
@@ -10,7 +11,7 @@ exports.addComment = async (req, res, next) => {
     const { content } = req.body;
     const projectId = req.params.id;
 
-    const project = await Project.findById(projectId);
+    const project = await Project.findById(projectId).populate("owner", "username");
     if (!project) return res.error("Project not found", StatusCodes.NOT_FOUND);
 
     const comment = await Comment.create({
@@ -20,6 +21,22 @@ exports.addComment = async (req, res, next) => {
     });
 
     await comment.populate("user", "name profilePhoto");
+
+    // Send notification to project owner (non-blocking)
+    if (project.owner && project.owner._id) {
+      notifyProjectCommented(
+        project.owner._id.toString(),
+        (req.user._id || req.user.userId).toString(),
+        project._id.toString(),
+        project.title,
+        project.slug,
+        project.owner.username,
+        content
+      ).catch((err) => {
+        console.error("Failed to send comment notification:", err);
+        // Don't throw - notification failure shouldn't break the comment creation
+      });
+    }
 
     return res.success(StatusCodes.OK, "Comment added successfully", comment);
   } catch (err) {

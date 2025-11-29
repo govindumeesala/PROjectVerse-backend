@@ -10,6 +10,7 @@ const mongoose = require("mongoose");
 const projectService = require("../services/projectServices");
 const slugify = require("slugify");
 const catchAsync = require("../utils/catchAsync");
+const { notifyProjectLiked } = require("../services/notificationService");
 
 // Helper: upload buffer to Cloudinary
 const uploadBufferToCloudinary = (buffer) => {
@@ -195,13 +196,28 @@ exports.getProjectFeed = async (req, res, next) => {
 exports.likeProject = async (req, res, next) => {
   const userObjectId = new mongoose.Types.ObjectId(req.user.userId);
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findById(req.params.id).populate("owner", "username");
     if (!project) {
       throw new AppError("Project not found", StatusCodes.NOT_FOUND);
     }
     if (!project.likes.includes(userObjectId)) {
       project.likes.push(userObjectId);
       await project.save();
+
+      // Send notification to project owner (non-blocking)
+      if (project.owner && project.owner._id) {
+        notifyProjectLiked(
+          project.owner._id.toString(),
+          req.user.userId,
+          project._id.toString(),
+          project.title,
+          project.slug,
+          project.owner.username
+        ).catch((err) => {
+          console.error("Failed to send like notification:", err);
+          // Don't throw - notification failure shouldn't break the like action
+        });
+      }
     }
 
     return res.success(StatusCodes.OK, "Project liked successfully", {
@@ -408,7 +424,6 @@ exports.getContributedProjects = async (req, res, next) => {
 
 exports.getProjectPage = async (req, res, next) => {
   try {
-    console.log(req)
     const { username, slug } = req.params;
     const userId = req.user?.userId || null;
     const project = await projectService.getProjectByUsernameAndSlug(

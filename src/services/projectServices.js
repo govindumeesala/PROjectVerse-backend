@@ -5,6 +5,11 @@ const AppError = require("../utils/AppError");
 const { StatusCodes } = require("http-status-codes");
 const ProjectRequest = require("../models/ProjectRequest");
 const mongoose = require("mongoose");
+const {
+  notifyCollabRequestReceived,
+  notifyCollabRequestApproved,
+  notifyCollabRequestRejected,
+} = require("./notificationService");
 
 exports.getProjectFeed = async ({ userId, cursor, limit, techStack, domain, search }) => {
   let match = {};
@@ -251,9 +256,11 @@ exports.requestToJoinProject = async (userId, username, slug, message, roleReque
   const owner = await User.findOne({ username }).select("_id");
   if (!owner) throw new AppError("Owner not found", StatusCodes.NOT_FOUND);
 
+  // Fetch project with all needed fields for notification
   const project = await Project.findOne({ owner: owner._id, slug })
     .collation({ locale: "en", strength: 2 })
-    .select("_id lookingForContributors");
+    .populate("owner", "username")
+    .select("_id title slug lookingForContributors owner");
   if (!project) throw new AppError("Project not found", StatusCodes.NOT_FOUND);
 
   if (!project.lookingForContributors) {
@@ -286,6 +293,21 @@ exports.requestToJoinProject = async (userId, username, slug, message, roleReque
     roleRequested,
   });
 
+  // Send notification to project owner (non-blocking)
+  if (project.owner && project.owner._id) {
+    notifyCollabRequestReceived(
+      project.owner._id.toString(),
+      userId,
+      project._id.toString(),
+      project.title,
+      project.slug,
+      project.owner.username
+    ).catch((err) => {
+      console.error("Failed to send collaboration request notification:", err);
+      // Don't throw - notification failure shouldn't break the request creation
+    });
+  }
+
   return newRequest;
 };
 
@@ -301,6 +323,12 @@ exports.respondToRequest = async (ownerId, requestId, action) => {
   if (request.status !== "pending") {
     throw new AppError("This request has already been handled", StatusCodes.BAD_REQUEST);
   }
+
+  // Populate project owner for notifications
+  await request.project.populate("owner", "username");
+  const projectOwner = request.project.owner;
+  const projectSlug = request.project.slug || "";
+  const projectTitle = request.project.title || "";
 
   if (action === "accept") {
     request.status = "approved";
@@ -318,6 +346,18 @@ exports.respondToRequest = async (ownerId, requestId, action) => {
       status: "active",
     });
 
+    // Send notification to requester (non-blocking)
+    notifyCollabRequestApproved(
+      request.requester._id.toString(),
+      ownerId.toString(),
+      request.project._id.toString(),
+      projectTitle,
+      projectSlug,
+      projectOwner.username
+    ).catch((err) => {
+      console.error("Failed to send approval notification:", err);
+    });
+
     return { success: true, message: "Request approved and collaborator added" };
   }
 
@@ -326,6 +366,18 @@ exports.respondToRequest = async (ownerId, requestId, action) => {
     request.reviewedBy = ownerId;
     request.reviewedAt = new Date();
     await request.save();
+
+    // Send notification to requester (non-blocking)
+    notifyCollabRequestRejected(
+      request.requester._id.toString(),
+      ownerId.toString(),
+      request.project._id.toString(),
+      projectTitle,
+      projectSlug,
+      projectOwner.username
+    ).catch((err) => {
+      console.error("Failed to send rejection notification:", err);
+    });
 
     return { success: true, message: "Request rejected" };
   }
